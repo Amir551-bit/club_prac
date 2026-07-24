@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Seting(BaseSettings):
+class Setting(BaseSettings):
     SQLALCHEMY_DATABASE_URL: str
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
@@ -11,4 +11,4 @@ class Seting(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
 
-setting = Seting()
+setting = Setting()  

@@ -4,6 +4,10 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jwt.exceptions import DecodeError, ExpiredSignatureError, InvalidSignatureError
 from core.Models.user.user_model import User
+from core.Models.role.role_model import Role
+from core.Models.user_role.user_role_model import UserRole
+from core.Models.role.permission import Permission
+from core.execptions.execption import raise_bad_request
 import jwt
 
 from sqlite.database import get_db
@@ -144,3 +148,10 @@ def decode_refresh_token(token: str):
             detail="Authentication failed, token decode failed",
         )
     
+
+
+
+def check_admin(db: Session, user: User, permission: Permission):
+    user_role = db.query(UserRole).filter(UserRole.user_id==user.id).first()
+    if not user_role.roles.has_permission(permission):
+        raise_bad_request("you have not permission")

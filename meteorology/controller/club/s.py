@@ -1,0 +1,17 @@
+        # request.club_name 
+        # request.club_name_english 
+        # request.less_description 
+        # request.description 
+        # request.logo 
+        # request.cover_image 
+        # request.contact_number 
+        # request.mobile_number
+        # request.address 
+        # request.club_rules
+        # request.status_club_site 
+        # request.map_link 
+        # request.social_network_link
+        # request.messenger_link 
+        # request.geographical_location 
+        # request.license_number_legal_information 
+        # request.email 

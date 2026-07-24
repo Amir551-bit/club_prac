@@ -7,8 +7,8 @@ class Gender(IntEnum):
 
 
 class MembershipStatusForAthlete(IntEnum):
-    yes = 1
-    no = 2
+    active = 1
+    inactive = 2
 
 
 class MainGoal(IntEnum):
@@ -35,5 +35,5 @@ class SpecialtiesEnum(IntEnum):
 
 
 class CooperationStatusForCoach(IntEnum):
-    yes = 1
-    no = 2
+    active = 1
+    inactive = 2
