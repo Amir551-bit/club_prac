@@ -38,6 +38,8 @@ class ProfileAthlete(Base):
         back_populates="athlete", 
         foreign_keys="[ProgressPicture.data_recorder_athlete]"
     )
+    meal_plans = relationship("MealPlan", back_populates="athlete")
+
 
     @classmethod
     def create(cls, user_id: int, first_name: str, last_name: str, number_phone: str,

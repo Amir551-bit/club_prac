@@ -172,13 +172,14 @@ class MovementBank(Base):
         self.target_muscle = target_muscle if target_muscle is not None else self.target_muscle
         self.auxiliary_muscles = auxiliary_muscles if auxiliary_muscles is not None else self.auxiliary_muscles
         self.required_equipment = required_equipment if required_equipment is not None else self.required_equipment
-        self.difficulty_level = difficulty_level.value if difficulty_level is not None else self.difficulty_level
         self.description_for_move = description_for_move if description_for_move is not None else self.description_for_move
         self.executive_warnings = executive_warnings if executive_warnings is not None else self.executive_warnings
-        self.active_status = active_status.value if active_status is not None else self.active_status
         self.image = image if image is not None else self.image
         self.video_link = video_link if video_link is not None else self.video_link
-
+        if difficulty_level is not None:
+            self.difficulty_level = difficulty_level.value
+        if active_status is not None:
+            self.active_status = active_status.value
 
 
 class InformationForMovement(Base):
@@ -268,12 +269,12 @@ class RegistrationDailyPractice(Base):
     information_for_movement_id = Column(Integer, ForeignKey("information_for_movement.id"), nullable=False)
     done_status = Column(Boolean, default=False, nullable=False)
     done_date = Column(Date, default=func.current_date(), nullable=False)
-    actual_weight_used = Column(Integer, nullable=True)
+    actual_weight_used = Column(Integer, nullable=False)
     actual_number_repeat = Column(Integer, nullable=False)
     difficulty_exercise = Column(Integer, nullable=False)
-    time_practice = Column(Integer, nullable=False)
+    time_practice = Column(String(100), nullable=False)
     description_for_coach = Column(Text, nullable=True)
-    Problem_during_exercise = Column(Text, nullable=True)
+    problem_during_exercise = Column(Text, nullable=True)
 
     created_date = Column(DateTime, server_default = func.now())
     update_date = Column(DateTime, server_default = func.now(), server_onupdate = func.now())
@@ -282,5 +283,38 @@ class RegistrationDailyPractice(Base):
     movements_info = relationship("InformationForMovement", back_populates="registrations")
 
 
+    @classmethod
+    def create(cls, athlete_id: int, information_for_movement_id: int, done_status: bool, done_date: Date,
+               actual_weight_used: int, actual_number_repeat: int, difficulty_exercise: ExeeciseIntencity, time_practice: str,
+               description_for_coach: str | None = None, problem_during_exercise: str | None = None):
+
+        instance = cls()
+        instance.athlete_id = athlete_id
+        instance.information_for_movement_id = information_for_movement_id
+        instance.done_status = done_status
+        instance.done_date = done_date
+        instance.actual_weight_used = actual_weight_used
+        instance.actual_number_repeat = actual_number_repeat
+        instance.difficulty_exercise = difficulty_exercise.value
+        instance.time_practice = time_practice
+        instance.description_for_coach = description_for_coach
+        instance.problem_during_exercise = problem_during_exercise
+        return instance
+
+
+    def update(self, done_status: bool | None = None, done_date: date | None = None, actual_weight_used: int | None = None, 
+               actual_number_repeat: int | None = None, difficulty_exercise: ExeeciseIntencity | None = None, 
+               time_practice: str | None = None, description_for_coach: str | None = None, 
+               problem_during_exercise: str | None = None):
+
+        done_status = done_status if done_status is not None else self.done_status
+        done_date = done_date if done_date is not None else self.done_date
+        actual_weight_used = actual_weight_used if actual_weight_used is not None else self.actual_weight_used
+        actual_number_repeat = actual_number_repeat if actual_number_repeat is not None else self.actual_number_repeat
+        time_practice = time_practice if time_practice is not None else self.time_practice
+        description_for_coach = description_for_coach if description_for_coach is not None else self.description_for_coach
+        problem_during_exercise = problem_during_exercise if problem_during_exercise is not None else self.problem_during_exercise
+        if difficulty_exercise is not None:
+            self.difficulty_exercise = difficulty_exercise.value
 
 

@@ -1,0 +1,10 @@
+request.athlete_id,
+request.information_for_movement_id,
+request.done_status,
+request.done_date,
+request.actual_weight_used,
+request.actual_number_repeat,
+request.difficulty_exercise,
+request.time_practice,
+request.description_for_coach,
+request.problem_during_exercise

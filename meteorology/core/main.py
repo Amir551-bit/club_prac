@@ -28,6 +28,10 @@ from controller.club.club_route import club_gallery_router
 from controller.coach_to_athlete.coach_to_athlete_route import coach_to_athlete_router
 from controller.exercise_program_route.exercise_program_route import exercise_program_router
 from controller.user_role.user_role_route import user_role_router
+from controller.exercise_program_route.exercise_program_route import daily_practice_router
+from controller.exercise_program_route.exercise_program_route import movement_bank_router
+from controller.exercise_program_route.exercise_program_route import information_for_movement_router
+from controller.exercise_program_route.exercise_program_route import registration_daily_practice_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -56,6 +60,10 @@ app.include_router(club_gallery_router)
 app.include_router(coach_to_athlete_router)
 app.include_router(exercise_program_router)
 app.include_router(user_role_router)
+app.include_router(daily_practice_router)
+app.include_router(movement_bank_router)
+app.include_router(information_for_movement_router)
+app.include_router(registration_daily_practice_router)
 
 
 

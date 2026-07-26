@@ -61,7 +61,6 @@ class ExerciseProgramResponses(BaseModel):
 # program daily
 
 class CreateProgramDaily(BaseModel):
-        exercise_program_id: int
         title_session: str
         day_number: int
         description: str 
@@ -93,6 +92,18 @@ class ProgramDailyResponse(BaseModel):
 
         model_config = ConfigDict(from_attributes=True)
 
+
+class ProgramDailyResponseForOne(BaseModel):
+        daily_practice: ProgramDailyResponse
+        exercise_program: ExerciseProgramResponse
+
+        model_config = ConfigDict(from_attributes=True)
+
+
+class ProgramDailyResponses(BaseModel):
+        items: list[ProgramDailyResponse]
+        total: int
+        program: ExerciseProgramResponse
 
 
 # MovementBunk
@@ -146,8 +157,17 @@ class MovementBankresponse(BaseModel):
         active_status: ActiveStatusMovement
         image: str | None = None
         video_link: str | None = None
+        created_date: datetime
+        update_date: datetime
 
         model_config = ConfigDict(from_attributes=True)
+
+
+class MovementBankresponses(BaseModel):
+        items: list[MovementBankresponse]
+        total: int
+        limit: int
+        offset: int
 
 
 # Information Movement
@@ -188,3 +208,70 @@ class UpdateInformationForMovement(BaseModel):
         display_order: int | None = None
         alternate_move: str | None = None
         being_a_superset_or_a_dropset: bool | None = None
+
+
+class InformationForMovementResponse(BaseModel):
+
+        move_name: str
+        move_picture: str | None = None
+        link_video: str | None = None
+        set_number: int
+        number_of_repeat: int
+        suggested_weight: int | None = None
+        practice_time: str
+        rest_time: str
+        tempo: str
+        exercise_intensity: ExeeciseIntencity
+        description_coach: str | None = None
+        display_order: int
+        alternate_move: str | None = None
+        being_a_superset_or_a_dropset: bool
+
+
+        model_config = ConfigDict(from_attributes=True)
+
+
+
+# Registration_Daily_Practice
+
+
+class CreateRegistrationDailyPractice(BaseModel):
+
+        done_status: bool
+        done_date: date
+        actual_weight_used: int
+        actual_number_repeat: int
+        difficulty_exercise: ExeeciseIntencity
+        time_practice: str
+        description_for_coach: str | None = None
+        problem_during_exercise: str | None = None
+
+
+
+
+class UpdateRegistrationDailyPractice(BaseModel):
+
+        done_status: bool | None = None
+        done_date: date | None = None
+        actual_weight_used: int | None = None
+        actual_number_repeat: int | None = None
+        difficulty_exercise: ExeeciseIntencity | None = None
+        time_practice: str | None = None
+        description_for_coach: str | None = None
+        problem_during_exercise: str | None = None
+
+
+
+class RegistrationDailyPracticeResponse(BaseModel):
+
+        done_status: bool
+        done_date: date
+        actual_weight_used: int
+        actual_number_repeat: int
+        difficulty_exercise: ExeeciseIntencity
+        time_practice: str
+        description_for_coach: str | None = None
+        problem_during_exercise: str| None = None
+
+
+        model_config = ConfigDict(from_attributes=True)

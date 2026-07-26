@@ -1,0 +1,141 @@
+from pydantic import BaseModel, ConfigDict
+from core.Models.meal_plan.meal_plan_enum import MealStatus, Meals
+from datetime import date, datetime
+
+
+# Meal_Plan
+
+
+class CreateMealPlan(BaseModel):
+
+    title: str
+    start_date: date
+    end_date: date
+    purpose_program: str
+    number_meal: int
+    status: MealStatus
+    target_calories_needed: int | None = None
+    description: str | None = None
+
+
+
+
+class UpdateMealPlan(BaseModel):
+
+    title: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    purpose_program: str | None = None
+    number_meal: int | None = None
+    status: MealStatus | None = None
+    target_calories_needed: int | None = None
+    description: str | None = None
+
+
+
+class MealPlanResponse(BaseModel):
+    
+    athlete_id: int
+    coach_id: int
+    title: str
+    start_date: date
+    end_date: date
+    purpose_program: str
+    number_meal: int
+    status: MealStatus
+    target_calories_needed: int | None = None
+    description: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+
+# Meal_Plan_Daily
+
+
+class CreateMealPlanDaily(BaseModel):
+
+    meal_plan_id: int
+    title: str
+    meal: Meals
+    suggested_hours: datetime
+    description: str | None = None
+    alternative_option: str | None = None
+
+
+
+class UpdateMealPlanDaily(BaseModel):
+
+    meal_plan_id: int | None = None
+    title: str | None = None
+    meal: Meals | None = None
+    suggested_hours: datetime | None = None
+    description: str | None = None
+    alternative_option: str | None = None
+
+
+
+
+class MealPlanDailyResponse(BaseModel):
+
+    meal_plan_id: int
+    title: str
+    meal: Meals
+    suggested_hours: datetime
+    description: str | None = None
+    alternative_option: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+
+# Food_Items
+
+class CreateFoodItems(BaseModel):
+
+    meal_plan_daily_id: int
+    name_food_item: str
+    amount: str
+    unit: str
+    protein: bool
+    carbohydrates: bool
+    fat: bool
+    calories_on_record: int | None = None
+    description: str | None = None
+    alternatives: str | None = None
+
+
+
+
+class UpdateFoodItems(BaseModel):
+
+    meal_plan_daily_id: int | None = None
+    name_food_item: str | None = None
+    amount: str | None = None
+    unit: str | None = None
+    protein: bool | None = None
+    carbohydrates: bool | None = None
+    fat: bool | None = None
+    calories_on_record: int | None = None
+    description: str | None = None
+    alternatives: str | None = None
+
+
+
+
+
+class FoodItemsResponse(BaseModel):
+
+    meal_plan_daily_id: int
+    name_food_item: str
+    amount: str
+    unit: str
+    protein: bool
+    carbohydrates: bool
+    fat: bool
+    calories_on_record: int | None = None
+    description: str | None = None
+    alternatives: str | None = None
+
+
+    model_config = ConfigDict(from_attributes=True)

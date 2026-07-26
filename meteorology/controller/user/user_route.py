@@ -9,7 +9,7 @@ from core.security.jwt_auth import generate_access_token, generate_refresh_token
 from core.execptions.execption import raise_bad_request, raise_forbidden, raise_not_found
 
 
-user_route = APIRouter(prefix="/user", tags=["/user"])
+user_route = APIRouter(prefix="/user", tags=["user"])
 
 
 @user_route.post("/create", response_model=UserResponseModel)

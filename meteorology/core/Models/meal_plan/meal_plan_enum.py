@@ -1,7 +1,7 @@
 from enum import IntEnum
 
 
-class Status(IntEnum):
+class MealStatus(IntEnum):
     draft = 1
     active = 2
     completed = 3
@@ -20,3 +20,6 @@ class Meals(IntEnum):
     before_practice = 6
     after_practice = 7
     before_sleep = 8
+
+
+
