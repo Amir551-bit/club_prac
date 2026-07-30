@@ -32,6 +32,12 @@ from controller.exercise_program_route.exercise_program_route import daily_pract
 from controller.exercise_program_route.exercise_program_route import movement_bank_router
 from controller.exercise_program_route.exercise_program_route import information_for_movement_router
 from controller.exercise_program_route.exercise_program_route import registration_daily_practice_router
+from controller.meal_plan.meal_plan_route import meal_plan_router
+from controller.meal_plan.meal_plan_route import meal_plan_daily_router
+from controller.meal_plan.meal_plan_route import food_item_router
+from controller.progress_process.progress_process_route import progress_process_router
+from controller.progress_process.progress_process_route import progress_picture_router
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -64,7 +70,11 @@ app.include_router(daily_practice_router)
 app.include_router(movement_bank_router)
 app.include_router(information_for_movement_router)
 app.include_router(registration_daily_practice_router)
-
+app.include_router(meal_plan_router)
+app.include_router(meal_plan_daily_router)
+app.include_router(food_item_router)
+app.include_router(progress_process_router)
+app.include_router(progress_picture_router)
 
 
 @app.get("/")

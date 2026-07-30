@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Integer, func, Date, ForeignKey, Boolean, Text, Time
 from sqlalchemy.orm import relationship
 from sqlite.database import Base
-from datetime import datetime, date
+from datetime import datetime, date, time
 from core.Models.meal_plan.meal_plan_enum import MealStatus, Meals
 
 
@@ -80,7 +80,7 @@ class MealPlanDaily(Base):
 
 
     @classmethod
-    def create(cls, meal_plan_id: int, title: str, meal: Meals, suggested_hours: datetime, description: str | None = None,
+    def create(cls, meal_plan_id: int, title: str, meal: Meals, suggested_hours: time, description: str | None = None,
                alternative_option: str | None = None):
         
         instance = cls()
@@ -94,7 +94,7 @@ class MealPlanDaily(Base):
 
 
 
-    def update(self, title: str | None = None, meal: Meals | None = None, suggested_hours: datetime | None = None, 
+    def update(self, title: str | None = None, meal: Meals | None = None, suggested_hours: time | None = None, 
                description: str | None = None, alternative_option: str | None = None):
 
         self.title = title if title is not None else self.title
@@ -157,7 +157,7 @@ class FoodItems(Base):
         self.carbohydrates = carbohydrates if carbohydrates is not None else self.carbohydrates
         self.fat = fat if fat is not None else self.fat
         self.description = description if description is not None else self.description
-        self.alternatives - alternatives if alternatives is not None else self.alternatives
+        self.alternatives = alternatives if alternatives is not None else self.alternatives
 
 
 

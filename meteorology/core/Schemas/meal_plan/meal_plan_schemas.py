@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from core.Models.meal_plan.meal_plan_enum import MealStatus, Meals
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 
 # Meal_Plan
@@ -55,10 +55,9 @@ class MealPlanResponse(BaseModel):
 
 class CreateMealPlanDaily(BaseModel):
 
-    meal_plan_id: int
     title: str
     meal: Meals
-    suggested_hours: datetime
+    suggested_hours: time
     description: str | None = None
     alternative_option: str | None = None
 
@@ -69,7 +68,7 @@ class UpdateMealPlanDaily(BaseModel):
     meal_plan_id: int | None = None
     title: str | None = None
     meal: Meals | None = None
-    suggested_hours: datetime | None = None
+    suggested_hours: time | None = None
     description: str | None = None
     alternative_option: str | None = None
 
@@ -81,7 +80,7 @@ class MealPlanDailyResponse(BaseModel):
     meal_plan_id: int
     title: str
     meal: Meals
-    suggested_hours: datetime
+    suggested_hours: time
     description: str | None = None
     alternative_option: str | None = None
 
@@ -89,11 +88,19 @@ class MealPlanDailyResponse(BaseModel):
 
 
 
+class MealPlanDailyResponses(BaseModel):
+
+    items: list[MealPlanDailyResponse]
+    total: int
+    limit: int
+    offset: int
+    meal_plan: MealPlanResponse
+
+
 # Food_Items
 
 class CreateFoodItems(BaseModel):
 
-    meal_plan_daily_id: int
     name_food_item: str
     amount: str
     unit: str
@@ -108,8 +115,7 @@ class CreateFoodItems(BaseModel):
 
 
 class UpdateFoodItems(BaseModel):
-
-    meal_plan_daily_id: int | None = None
+    
     name_food_item: str | None = None
     amount: str | None = None
     unit: str | None = None
@@ -139,3 +145,12 @@ class FoodItemsResponse(BaseModel):
 
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class FoodItemsResponses(BaseModel):
+
+    items : list[FoodItemsResponse]
+    total : int
+    limit : int
+    offset : int
+    meal_plan_daily : MealPlanDailyResponse

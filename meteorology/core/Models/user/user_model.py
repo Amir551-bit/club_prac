@@ -20,6 +20,7 @@ class User(Base):
     user_roles = relationship("UserRole", back_populates="users")
     coach = relationship("ProfileCoach", back_populates="users")
     athlete = relationship("ProfileAthlete", back_populates="users")
+    announcement = relationship("ClubAnnouncementsNews", back_populates="users")
 
 
     @classmethod
