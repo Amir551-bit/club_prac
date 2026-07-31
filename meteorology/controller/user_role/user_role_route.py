@@ -28,10 +28,12 @@ def get_user_role_or_404(user_id: int, db: Session):
 
 def build_for_user_role(user_role: UserRole):
     user_name = user_role.users.user_name
+    name_role = user_role.roles.name
     return {
         "user_name" : user_name,
         "user_id" : user_role.user_id,
-        "user_role" : user_role.role_id,
+        "role_id" : user_role.role_id,
+        "name_role" : name_role
     }
 
 
@@ -56,7 +58,7 @@ def get_all(limit: int = Query(20, ge=1, le=100),
             current_user: User = Depends(get_current_user)):
 
     check_admin(db, current_user, Permission.club_owner)
-    user_role = db.query(UserRole)
+    user_role = db.query(UserRole).join(User).join(Role)
     total = user_role.count()
     items = user_role.order_by(UserRole.id.desc()).offset(offset).limit(limit).all()
     return {

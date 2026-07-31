@@ -33,7 +33,7 @@ def create(request: CreateClubAnnouncementsNew,
            current_user: User = Depends(get_current_user)):
     
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if not (user_role.role_id == 2 or user_role.role_id == 3 or user_role.role_id == 4):
+    if not (user_role.role_id == 1 or user_role.role_id == 2 or user_role.role_id == 3 or user_role.role_id == 4):
         raise_bad_request("you have not permission")
 
     new = ClubAnnouncementsNews.create(request.title, request.text, request.image, request.notification_type,
@@ -53,7 +53,7 @@ def update(request: UpdateClubAnnouncementsNew,
            club_noti: ClubAnnouncementsNews = Depends(get_club_announcements_news_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if not (user_role.role_id == 3 or club_noti.author == current_user.id):
+    if not (user_role.role_id == 2 or user_role.role_id == 3 or club_noti.author == current_user.id):
         raise_bad_request("validation problem")
     club_noti.update(request.title, request.text, request.image, request.notification_type, request.importance,
                      request.audience, request.publication_date, request.expiration_date, request.release_status,
@@ -70,7 +70,7 @@ def delete(db: Session = Depends(get_db),
            club_noti: ClubAnnouncementsNews = Depends(get_club_announcements_news_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if not (user_role.role_id == 3 or club_noti.author == current_user.id):
+    if not (user_role.role_id == 2 or user_role.role_id == 3 or club_noti.author == current_user.id):
         raise_bad_request("validation problem")
     db.delete(club_noti)
     db.commit()
@@ -89,14 +89,17 @@ def get_one(db: Session = Depends(get_db),
     if club_noti.audience == 2:
         return club_noti
     elif club_noti.audience == 3:
-        if user_role.role_id == 4:
+        if user_role.role_id == 4 or user_role.role_id == 3 or user_role.role_id == 2:
             return club_noti
     elif club_noti.audience == 4:
-        user_coach = club_noti.author
-        coach_profile = get_profile_coach(user_coach, db)
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
-        return club_noti
+        if club_noti.author == current_user.id or user_role.role_id == 3 or user_role.role_id == 2:
+            return club_noti
+        else:
+            user_coach = club_noti.author
+            coach_profile = get_profile_coach(user_coach, db)
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
+            return club_noti
     else:
         return {
             "detail" : "this announcement is not for you"

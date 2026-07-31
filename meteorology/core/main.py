@@ -16,6 +16,8 @@ from core.Models.profile.profile_coach_model import ProfileCoach, Specialties
 from core.Models.role.role_model import Role
 from core.Models.user_role.user_role_model import UserRole
 from core.Models.user.user_model import User
+from core.Models.club_announcements_and_news.club_announcements_news_model import ClubAnnouncementsNews
+
 
 from controller.user.user_route import user_route
 from controller.profile_coach.profile_coach_route import profile_coach_router
@@ -37,6 +39,7 @@ from controller.meal_plan.meal_plan_route import meal_plan_daily_router
 from controller.meal_plan.meal_plan_route import food_item_router
 from controller.progress_process.progress_process_route import progress_process_router
 from controller.progress_process.progress_process_route import progress_picture_router
+from controller.club_announcements_news.club_announcements_news_route import club_announcements_news_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -75,6 +78,7 @@ app.include_router(meal_plan_daily_router)
 app.include_router(food_item_router)
 app.include_router(progress_process_router)
 app.include_router(progress_picture_router)
+app.include_router(club_announcements_news_router)
 
 
 @app.get("/")

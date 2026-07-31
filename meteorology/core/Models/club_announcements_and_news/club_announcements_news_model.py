@@ -12,6 +12,7 @@ from sqlite.database import get_db
 
 
 
+
 class ClubAnnouncementsNews(Base):
     __tablename__="club_announcements_news"
 
