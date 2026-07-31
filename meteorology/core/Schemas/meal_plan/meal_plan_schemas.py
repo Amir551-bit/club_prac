@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from core.Models.meal_plan.meal_plan_enum import MealStatus, Meals
 from datetime import date, datetime, time
-
+from core.Models.notification_system.notification_system_enum import NotificationsRequiredEnum
 
 # Meal_Plan
 
@@ -154,3 +154,12 @@ class FoodItemsResponses(BaseModel):
     limit : int
     offset : int
     meal_plan_daily : MealPlanDailyResponse
+
+
+
+class CreateNotification(BaseModel):
+    
+    title: str
+    text: str
+    type: NotificationsRequiredEnum
+    read_status: bool

@@ -39,6 +39,7 @@ class ProfileAthlete(Base):
         foreign_keys="[ProgressPicture.data_recorder_athlete]"
     )
     meal_plans = relationship("MealPlan", back_populates="athlete")
+    notifications = relationship("NotificationSystem", back_populates="athlete")
 
 
     @classmethod
@@ -70,8 +71,7 @@ class ProfileAthlete(Base):
     def update(self, first_name: str | None = None, last_name: str | None = None, number_phone: str | None = None,
                email: str | None = None, date_of_birth: date | None = None, gender: Gender | None = None,
                height: str | None = None, initial_weight: str | None = None, training_goal: str | None = None,
-               date_of_membership: date | None = None, membership_status: MembershipStatusForAthlete | None = None,
-               the_main_trainer: str | None = None, management_description: str | None = None, 
+               date_of_membership: date | None = None, the_main_trainer: str | None = None, management_description: str | None = None, 
                emergency_contact_number_if_needed: str | None = None):
         
         self.first_name = first_name if first_name is not None else self.first_name
@@ -88,8 +88,11 @@ class ProfileAthlete(Base):
         self.emergency_contact_number_if_needed = emergency_contact_number_if_needed if emergency_contact_number_if_needed is not None else self.emergency_contact_number_if_needed
         if gender is not None:
             self.gender = gender
-        if membership_status is not None:
-            self.membership_status = membership_status
+
+
+    def change_membership_status(self, status: MembershipStatusForAthlete):
+
+        self.membership_status = status.value
 
 
 class AthleteSportsInfo(Base):

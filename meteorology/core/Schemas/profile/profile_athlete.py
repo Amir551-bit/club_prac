@@ -1,7 +1,8 @@
 from pydantic import BaseModel, ConfigDict, field_validator
 from core.Models.profile.profile_enum import (Gender, MembershipStatusForAthlete, MainGoal,
                                               SpecialtiesEnum, CooperationStatusForCoach)
-from datetime import date
+from datetime import date, datetime
+from core.Models.notification_system.notification_system_enum import NotificationsRequiredEnum
 
 
 class CreateProfileAthleteSchema(BaseModel):
@@ -68,7 +69,6 @@ class UpdateProfileAthlete(BaseModel):
     initial_weight: str | None = None
     training_goal: str | None = None
     date_of_membership:  date | None = None
-    membership_status: MembershipStatusForAthlete | None = None
     the_main_trainer: str | None = None
     management_description: str | None = None 
     emergency_contact_number_if_needed: str | None = None 
@@ -88,7 +88,21 @@ class UpdateProfileAthlete(BaseModel):
     #         if not value_str.endswith("kg"):
     #             return f"{value_str}kg"
     #         return value_str
-        
+
+
+
+class ChangeStatusMembership(BaseModel):
+    status: MembershipStatusForAthlete
+
+
+class CreateNotification(BaseModel):
+    
+    title: str
+    text: str
+    type: NotificationsRequiredEnum
+    read_status: bool
+
+
 
 
 class ProfileAthleteResponses(BaseModel):

@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from core.Models.Exercise_program.exercise_program_enum import (ProgramStatus, DifficulityLevelMovement, 
                                                                 ActiveStatusMovement, Time, ExeeciseIntencity)
 from datetime import date, datetime
-
+from core.Models.notification_system.notification_system_enum import NotificationsRequiredEnum
 
 class CreateExerciseProgram(BaseModel):
 
@@ -275,3 +275,14 @@ class RegistrationDailyPracticeResponse(BaseModel):
 
 
         model_config = ConfigDict(from_attributes=True)
+
+
+
+
+class CreateNotification(BaseModel):
+    
+    title: str
+    text: str
+    type: NotificationsRequiredEnum
+    read_status: bool
+

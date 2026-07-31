@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from core.Models.connection_coach_to_athlete.coach_to_athlete_enum import CoachTypeEnum, ConnectionStatusEnum
-from datetime import date
-
+from datetime import date, datetime
+from core.Models.notification_system.notification_system_enum import NotificationsRequiredEnum
 
 
 class CreateCoachToAthlete(BaseModel):
@@ -21,6 +21,11 @@ class UpdateCoachToAthlete(BaseModel):
     coach_role: CoachTypeEnum | None = None
     manager_notes: str | None = None 
     end_date: date | None = None
+
+
+
+class ChangeCoach(BaseModel):
+    profile_coach_id: int
 
 
 
@@ -44,4 +49,11 @@ class CoachToAthleteResponses(BaseModel):
     offset: int
 
 
+
+class CreateNotification(BaseModel):
+    
+    title: str
+    text: str
+    type: NotificationsRequiredEnum
+    read_status: bool
 

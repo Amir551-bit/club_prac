@@ -12,6 +12,7 @@ from core.Models.profile.profile_coach_model import ProfileCoach
 from core.Models.profile.profile_athlete_model import ProfileAthlete
 from core.Models.connection_coach_to_athlete.coach_to_athlete_enum import ConnectionStatusEnum
 from core.Models.user_role.user_role_model import UserRole
+from core.Models.notification_system.notification_system_model import NotificationSystem
 
 exercise_program_router = APIRouter(prefix="/exercise/program", tags=["exercise_program"])
 daily_practice_router = APIRouter(prefix="/daily/practice", tags=["daily_practice"])
@@ -177,6 +178,7 @@ def build_registration_daily_practice(registration: RegistrationDailyPractice, d
 
 @exercise_program_router.post("/create/{profile_id}", response_model=ExerciseProgramResponse)
 def create_exercise_program(request: CreateExerciseProgram,
+                            requests: CreateNotification,
                             db: Session = Depends(get_db),
                             current_user: User = Depends(get_current_user),
                             athlete: ProfileAthlete = Depends(get_profile_athlete_for_path)):
@@ -192,11 +194,16 @@ def create_exercise_program(request: CreateExerciseProgram,
     db.add(new_program)
     db.commit()
     db.refresh(new_program)
+    new_notification = NotificationSystem.create(athlete.id, requests.type, requests.title, requests.text,
+                                                 requests.read_status)
+    db.add(new_notification)
+    db.commit()
     return new_program
 
 
 @exercise_program_router.put("/update/{program_id}", response_model=ExerciseProgramResponse)
 def update_exercise_program(request: UpdateExerciseProgram,
+                            requests: CreateNotification,
                             db: Session = Depends(get_db),
                             athlete_id: int = Query(...),
                             current_user: User = Depends(get_current_user),
@@ -211,6 +218,10 @@ def update_exercise_program(request: UpdateExerciseProgram,
     request.program_version, request.coach_note)
     db.commit()
     db.refresh(program)
+    new_notification = NotificationSystem.create(athlete.id, requests.type, requests.title, requests.text,
+                                                 requests.read_status)
+    db.add(new_notification)
+    db.commit()
     return program
 
 

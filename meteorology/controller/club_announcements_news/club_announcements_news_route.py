@@ -86,7 +86,7 @@ def get_one(db: Session = Depends(get_db),
             club_noti: ClubAnnouncementsNews = Depends(get_club_announcements_news_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if club_noti.audience == 2:
+    if club_noti.audience == 2 or club_noti.audience == 1:
         return club_noti
     elif club_noti.audience == 3:
         if user_role.role_id == 4 or user_role.role_id == 3 or user_role.role_id == 2:
@@ -104,6 +104,8 @@ def get_one(db: Session = Depends(get_db),
         return {
             "detail" : "this announcement is not for you"
         }
-    
+
+
+
 
 

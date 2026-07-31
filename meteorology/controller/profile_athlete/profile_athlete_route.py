@@ -10,6 +10,7 @@ from core.Models.role.role_model import Role
 from core.Models.user_role.user_role_model import UserRole
 from core.Models.role.permission import Permission
 from core.security.jwt_auth import check_admin
+from core.Models.notification_system.notification_system_model import NotificationSystem
 
 
 profile_athlete_route = APIRouter(prefix="/profile/athlete", tags=["profile_athlete"])
@@ -81,9 +82,29 @@ def update_profile_athlete(request: UpdateProfileAthlete,
     check_admin(db, current_user, Permission.club_manager)
     profile.update(request.first_name, request.last_name, request.number_phone, request.email,
                    request.date_of_birth, request.gender, request.height, request.initial_weight,
-                   request.training_goal, request.date_of_membership, request.membership_status, request.the_main_trainer,
+                   request.training_goal, request.date_of_membership, request.the_main_trainer,
                    request.management_description, request.emergency_contact_number_if_needed)
     db.commit()
+    return profile
+
+
+@profile_athlete_route.put("/change/status/membership/{profile_id}", response_model=ProfileAthleteResponse)
+def change_status_membership(request: ChangeStatusMembership,
+                             requests: CreateNotification,
+                             db: Session = Depends(get_db),
+                             current_user: User = Depends(get_current_user),
+                             profile: ProfileAthlete = Depends(get_profile_athlete_for_path)):
+
+    check_admin(db, current_user, Permission.club_manager)
+    if profile.membership_status == request.status:
+        raise_bad_request("You did not make any changes.")
+    profile.change_membership_status(request.status)
+    db.commit()
+    db.refresh(profile)
+    new_notif = NotificationSystem.create(profile.id, requests.title, requests.text, requests.type, requests.read_status)
+    db.add(new_notif)
+    db.commit()
+    db.refresh(new_notif)
     return profile
 
 

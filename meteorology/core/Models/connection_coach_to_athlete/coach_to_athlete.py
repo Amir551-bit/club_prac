@@ -54,5 +54,8 @@ class CoachAthleteConnection(Base):
             self.status = status.value
         if coach_role is not None:
             self.coach_role = coach_role.value
-        
+
+
+    def change_coach(self, profile_coach_id: int):
+        self.profile_coach_id = profile_coach_id
 

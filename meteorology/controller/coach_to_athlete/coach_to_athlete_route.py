@@ -11,6 +11,7 @@ from core.security.jwt_auth import check_admin, get_current_user
 from core.Models.role.permission import Permission
 from core.Schemas.profile.profile_athlete import ProfileAthleteResponse
 from controller.profile_coach.profile_coach_route import get_profile_coach_for_path
+from core.Models.notification_system.notification_system_model import NotificationSystem
 
 
 coach_to_athlete_router = APIRouter(prefix="/coach/to/athlete", tags=["coach_to_athlete"])
@@ -43,7 +44,7 @@ def get_coach_to_athlete_for_path(id: int = Path(...),
 
 def build_get_response_coach_to_athlete(connect: CoachAthleteConnection):
 
-    profile =  connect.athlete
+    profile_athlete = connect.athlete
     return {
         "profile_coach_id": connect.profile_coach_id,
         "profile_athlete_id": connect.profile_athlete_id,
@@ -52,7 +53,7 @@ def build_get_response_coach_to_athlete(connect: CoachAthleteConnection):
         "coach_role": connect.coach_role,
         "manager_notes": connect.manager_notes,
         "end_date": connect.end_date,
-        "profile_athlete" : profile
+        "profile_athlete" : profile_athlete
     }
 
 
@@ -90,6 +91,27 @@ def update_coach_to_athlete(request: UpdateCoachToAthlete,
     db.refresh(connect)
     return connect
 
+
+
+@coach_to_athlete_router.put("/update/coach/{id}", response_model=CoachToAthleteResponse)
+def change_coach(request: ChangeCoach,
+                 requests: CreateNotification,
+                 db: Session = Depends(get_current_user),
+                 current_user: User = Depends(get_current_user),
+                 connect: CoachAthleteConnection = Depends(get_coach_to_athlete_for_path)):
+
+    check_admin(db, current_user, Permission.club_manager)
+    get_profile_coach_or_404(request.profile_coach_id, db)
+    if connect.profile_coach_id == request.profile_coach_id:
+        raise_bad_request("this athlete has this coach name profile")
+    connect.change_coach(request.profile_coach_id)
+    db.commit()
+    db.refresh(connect)
+    new_notification = NotificationSystem.create(connect.profile_athlete_id, requests.type, requests.title, requests.text,
+                                                 requests.read_status)
+    db.add(new_notification)
+    db.commit()
+    return connect
 
 
 @coach_to_athlete_router.delete("/delete/{id}")

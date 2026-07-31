@@ -12,6 +12,7 @@ from core.Models.user.user_model import User
 from core.Models.role.permission import Permission
 from core.execptions.execption import raise_bad_request, raise_forbidden, raise_not_found
 from core.Models.user_role.user_role_model import UserRole
+from core.Models.notification_system.notification_system_model import NotificationSystem
 
 
 meal_plan_router = APIRouter(prefix="/meal/plan", tags=["meal_plan"])
@@ -134,6 +135,7 @@ def build_food_item_with_meal_plan_daily_all(limit: int, offset: int, meal_plan_
 
 @meal_plan_router.post("/create/{profile_id}", response_model=MealPlanResponse)
 def create_meal_plan(request: CreateMealPlan,
+                     requests: CreateNotification,
                      db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user),
                      athlete_profile: ProfileAthlete = Depends(get_profile_athlete_for_path)):
@@ -146,12 +148,17 @@ def create_meal_plan(request: CreateMealPlan,
     db.add(new_meal_plan)
     db.commit()
     db.refresh(new_meal_plan)
+    new_notification = NotificationSystem.create(athlete_profile.id, requests.type, requests.title, requests.text,
+                                                 requests.read_status)
+    db.add(new_notification)
+    db.commit()
     return new_meal_plan
 
 
 
 @meal_plan_router.put("/update/{meal_plan_id}", response_model=MealPlanResponse)
 def update_meal_plan(request: UpdateMealPlan,
+                     requests: CreateNotification,
                      db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user),
                      meal_plan: MealPlan = Depends(get_meal_plan_for_path)):
@@ -164,6 +171,10 @@ def update_meal_plan(request: UpdateMealPlan,
                      request.target_calories_needed, request.description)
     db.commit()
     db.refresh(meal_plan)
+    new_notification = NotificationSystem.create(meal_plan.athlete_id, requests.type, requests.title, requests.text,
+                                                 requests.read_status)
+    db.add(new_notification)
+    db.commit()
     return meal_plan
 
 
