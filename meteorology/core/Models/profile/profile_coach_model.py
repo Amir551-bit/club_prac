@@ -71,6 +71,9 @@ class ProfileCoach(Base):
         if cooperation_status is not None:
             self.cooperation_status = cooperation_status.value
 
+
+    def change_status_coach(self, status: CooperationStatusForCoach):
+        self.cooperation_status = status.value
     
 
 class Specialties(Base):
@@ -93,3 +96,6 @@ class Specialties(Base):
     def update(self, specialties: SpecialtiesEnum | None = None):
         if specialties is not None:
             self.specialties = specialties.value
+
+
+

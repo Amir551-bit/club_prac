@@ -8,35 +8,12 @@ from core.execptions.execption import raise_bad_request, raise_not_found, raise_
 from core.Models.role.permission import Permission
 from sqlite.database import get_db
 from sqlalchemy.orm import Session
+from controller.service.services import get_user_for_path, build_for_user_role, get_user_role_or_404
 
 
 user_role_router = APIRouter(prefix="/user/role", tags=["user_role"])
 
-
-def get_user_for_path(user_id: int = Path(...), 
-                      db: Session = Depends(get_db)):
-    exists = db.query(User).filter(User.id==user_id).first()
-    if not exists:
-        raise_not_found("user is not found")
-    return exists
-
-def get_user_role_or_404(user_id: int, db: Session):
-    exists = db.query(UserRole).filter(UserRole.user_id==user_id).first()
-    if not exists:
-        raise_not_found("user role for user is not found")
-    return exists
-
-def build_for_user_role(user_role: UserRole):
-    user_name = user_role.users.user_name
-    name_role = user_role.roles.name
-    return {
-        "user_name" : user_name,
-        "user_id" : user_role.user_id,
-        "role_id" : user_role.role_id,
-        "name_role" : name_role
-    }
-
-
+ 
 @user_role_router.put("/update/{user_id}", response_model=UserRoleResponse)
 def update_user_role(request: UpdateUserRole,
                     db: Session = Depends(get_db),

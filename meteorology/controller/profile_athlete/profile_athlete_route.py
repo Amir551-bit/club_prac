@@ -11,41 +11,13 @@ from core.Models.user_role.user_role_model import UserRole
 from core.Models.role.permission import Permission
 from core.security.jwt_auth import check_admin
 from core.Models.notification_system.notification_system_model import NotificationSystem
-
+from core.Models.connection_coach_to_athlete.coach_to_athlete import CoachAthleteConnection
+from controller.service.services import (get_profile_athlete_for_path, get_profile_athlete_or_404, get_athlete_sport_info_for_path,
+                                         get_athlete_sport_info_or_404, accepted_coach_to_athlete, get_profile_coach) 
 
 profile_athlete_route = APIRouter(prefix="/profile/athlete", tags=["profile_athlete"])
 athlete_sport_info = APIRouter(prefix="/athlete/sport/info", tags=["sport_info_athlete"])
-
-def get_profile_athlete_for_path(profile_id: int = Path(...),
-                                 db: Session = Depends(get_db)):
-    exists = db.query(ProfileAthlete).filter(ProfileAthlete.id==profile_id).first()
-    if not exists:
-        raise_not_found("profile is not found")
-    return exists
-
-
-def get_profile_athlete_or_404(profile_id: int,
-                                 db: Session):
-    exists = db.query(ProfileAthlete).filter(ProfileAthlete.id==profile_id).first()
-    if not exists:
-        raise_not_found("profile is not found")
-    return exists
-
-
-def get_athlete_sport_info_for_path(athlete_sport_info_id: int = Path(...),
-                           db: Session = Depends(get_db)):
-    exists = db.query(AthleteSportsInfo).filter(AthleteSportsInfo.id==athlete_sport_info_id).first()
-    if not exists:
-        raise_not_found("sport info for this user is not found")
-    return exists
-
-def get_athlete_sport_info_or_404(athlete_sport_info_id: int,
-                           db: Session):
-    exists = db.query(AthleteSportsInfo).filter(AthleteSportsInfo.id==athlete_sport_info_id).first()
-    if not exists:
-        raise_not_found("sport info for this user is not found")
-    return exists
-
+  
 
 @profile_athlete_route.post("/create", response_model=ProfileAthleteResponse)
 def create_profile_athlete(request: CreateProfileAthleteSchema,
@@ -101,25 +73,32 @@ def change_status_membership(request: ChangeStatusMembership,
     profile.change_membership_status(request.status)
     db.commit()
     db.refresh(profile)
-    new_notif = NotificationSystem.create(profile.id, requests.title, requests.text, requests.type, requests.read_status)
+    new_notif = NotificationSystem.create(profile.id, requests.type, requests.title, requests.text, requests.read_status)
     db.add(new_notif)
     db.commit()
     db.refresh(new_notif)
     return profile
 
 
-@profile_athlete_route.delete("/delete/{profile_id}")
+@profile_athlete_route.delete("/deleted/profile/athlete/{profile_id}")
 def delete_profile_athlete(db: Session = Depends(get_db),
                            current_user: User = Depends(get_current_user),
                            profile: ProfileAthlete = Depends(get_profile_athlete_for_path)):
+
     check_admin(db, current_user, Permission.club_manager)
+    full_name = f"{profile.first_name} {profile.last_name}"
+    exists_connect_coach_to_athlete = db.query(CoachAthleteConnection).filter(
+                                    CoachAthleteConnection.profile_athlete_id==profile.id).first()
+    if exists_connect_coach_to_athlete:
+        raise_bad_request("the athlete has coach")
+    deleted_sport_info = db.query(AthleteSportsInfo).filter(AthleteSportsInfo.athlete_id==profile.id).delete(synchronize_session=False)
     db.delete(profile)
     db.commit()
     return {
-        "deleted successfully"
+        "detail" : f"{full_name} is inactive succesfully"
     }
 
-
+    
 @profile_athlete_route.get("/get/{profile_id}",response_model=ProfileAthleteResponse)
 def get_profile_athlete(db: Session = Depends(get_db),
                         current_user: User = Depends(get_current_user),
@@ -229,7 +208,7 @@ def delete_athlete_sport_info(db: Session = Depends(get_db),
                               cuurent_user: User = Depends(get_current_user),
                               sport: AthleteSportsInfo = Depends(get_athlete_sport_info_for_path)):
     
-    check_admin(db, cuurent_user, Permission.club_owner)
+    check_admin(db, cuurent_user, Permission.club_manager)
     db.delete(sport)
     db.commit()
     return {
@@ -239,42 +218,65 @@ def delete_athlete_sport_info(db: Session = Depends(get_db),
 
 
 @athlete_sport_info.get("/get/athlete/sport/info", response_model=AthleteSportsInfoResponses)
-def get_for_athlete(athlete_id: int = Query(...),
+def get_for_athlete_sport_info(athlete_id: int = Query(...),
                     limit: int = Query(20, ge=1, le=100),
                     offset: int = Query(0, ge=0),
                     db: Session = Depends(get_db),
                     current_user: User = Depends(get_current_user)):
-    
-    check_admin(db, current_user, Permission.coach)
-    get_profile_athlete_or_404(athlete_id, db)
+
+    athlete_profile = get_profile_athlete_or_404(athlete_id, db)
     sport_info = db.query(AthleteSportsInfo).filter(AthleteSportsInfo.athlete_id==athlete_id)
     total = sport_info.count()
     items = sport_info.order_by(AthleteSportsInfo.id.desc()).offset(offset).limit(limit).all()
-    return {
-        "items" : items,
-        "total" : total,
-        "limit" : limit,
-        "offset" : offset
-    }
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3):
+        return {
+            "items" : items,
+            "total" : total,
+            "limit" : limit,
+            "offset" : offset
+        }
+    elif user_role.role_id == 4:
+        coach_profile = get_profile_coach(current_user.id, db)
+        accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
+        return {
+            "items" : items,
+            "total" : total,
+            "limit" : limit,
+            "offset" : offset
+        }
+    elif user_role.role_id == 5:
+        profile_athlete = get_profile_athlete_or_404(current_user.id, db)
+        if athlete_profile.id == profile_athlete.id:
+            return {
+                "items" : items,
+                "total" : total,
+                "limit" : limit,
+                "offset" : offset
+            }      
+    else: 
+        return {
+            "detail" : "you have not permission"
+        }       
 
 
 
-@athlete_sport_info.get("/get/all", response_model=AthleteSportsInfoResponses)
-def get_all(limit: int = Query(20, ge=1, le=100),
-            offset: int = Query(0, ge=0),
-            db: Session = Depends(get_db),
-            current_user: User = Depends(get_current_user)):
+# @athlete_sport_info.get("/get/all", response_model=AthleteSportsInfoResponses)
+# def get_all(limit: int = Query(20, ge=1, le=100),
+#             offset: int = Query(0, ge=0),
+#             db: Session = Depends(get_db),
+#             current_user: User = Depends(get_current_user)):
     
-    check_admin(db, current_user, Permission.club_manager)
-    sport_info = db.query(AthleteSportsInfo)
-    total = sport_info.count()
-    items = sport_info.order_by(AthleteSportsInfo.id.desc()).offset(offset).limit(limit).all()
-    return {
-        "items" : items,
-        "total" : total,
-        "limit" : limit,
-        "offset" : offset
-    }
+#     check_admin(db, current_user, Permission.club_manager)
+#     sport_info = db.query(AthleteSportsInfo)
+#     total = sport_info.count()
+#     items = sport_info.order_by(AthleteSportsInfo.id.desc()).offset(offset).limit(limit).all()
+#     return {
+#         "items" : items,
+#         "total" : total,
+#         "limit" : limit,
+#         "offset" : offset
+#     }
 
 
     

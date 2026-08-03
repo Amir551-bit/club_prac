@@ -13,6 +13,12 @@ from core.Models.profile.profile_athlete_model import ProfileAthlete
 from core.Models.connection_coach_to_athlete.coach_to_athlete_enum import ConnectionStatusEnum
 from core.Models.user_role.user_role_model import UserRole
 from core.Models.notification_system.notification_system_model import NotificationSystem
+from controller.service.services import check_active_coach, check_active_athlete
+from controller.service.services import (get_profile_coach, get_profile_athlete_for_path, get_profile_athlete, get_profile_athlete_with_user_id,
+                                         accepted_coach_to_athlete, get_exercise_program_for_path, get_daily_practice_for_path,
+                                         get_information_for_movement_for_path, get_movement_bank_for_path, get_movement_bank,
+                                         get_registration_daily_practice_for_path, build_daily_practice, build_daily_practice_with_information_practice,
+                                         build_information_movement, build_registration_daily_practice, build_get_all_information_for_movement)
 
 exercise_program_router = APIRouter(prefix="/exercise/program", tags=["exercise_program"])
 daily_practice_router = APIRouter(prefix="/daily/practice", tags=["daily_practice"])
@@ -20,160 +26,7 @@ movement_bank_router = APIRouter(prefix="/movement/bank", tags=["movement_bank"]
 information_for_movement_router = APIRouter(prefix="/information/for/movement", tags=["information_for_movement"])
 registration_daily_practice_router = APIRouter(prefix="/registration/daily/practice", tags=["registration_daily_practice"])
 
-
-def get_profile_coach(user_id: int, db: Session):
-    exists = db.query(ProfileCoach).filter(ProfileCoach.user_id==user_id).first()
-    if not exists:
-        raise_not_found("profile coach is not found")
-    return exists
-
-def get_profile_athlete_for_path(profile_id: int = Path(...), 
-                        db: Session = Depends(get_db)):
-    exists = db.query(ProfileAthlete).filter(ProfileAthlete.id==profile_id).first()
-    if not exists:
-        raise_not_found("profile athlete is not found")
-    return exists
-
-def get_profile_athlete(profile_id: int, db: Session):
-    exists = db.query(ProfileAthlete).filter(ProfileAthlete.id==profile_id).first()
-    if not exists:
-        raise_not_found("profile athlete is not found")
-    return exists
-
-
-def get_profile_athlete_with_user_id(user_id: int,
-                                     db: Session):
-    exists = db.query(ProfileAthlete).filter(ProfileAthlete.user_id==user_id).first()
-    if not exists:
-        raise_not_found("profile is not found")
-    return exists
-
-def accepted_coach_to_athlete(coach_id: int, athlete_id: int, db: Session):
-    accepted = db.query(CoachAthleteConnection).filter(CoachAthleteConnection.profile_coach_id==coach_id,
-                                                           CoachAthleteConnection.profile_athlete_id==athlete_id,
-                                                           CoachAthleteConnection.status==1).first()
-    if not accepted:
-        raise_bad_request("you have not coach this athlete")
-    return accepted
-
-
-def get_exercise_program_for_path(program_id: int = Path(...),
-                                  db: Session = Depends(get_db)):
-    exists = db.query(ExerciseProgram).filter(ExerciseProgram.id==program_id).first()
-    if not exists:
-        raise_not_found("program is not found")
-    return exists
-
-
-def get_daily_practice_for_path(daily_practice_id: int = Path(...),
-                                db: Session = Depends(get_db)):
-    exists = db.query(DailyPractice).filter(DailyPractice.id==daily_practice_id).first()
-    if not exists:
-        raise_not_found("daily practice is not found")
-    return exists
-
-
-
-
-def get_movement_bank_for_path(movement_bank_id: int = Path(...),
-                               db: Session = Depends(get_db)):
-    exists = db.query(MovementBank).filter(MovementBank.id==movement_bank_id).first()
-    if not exists:
-        raise_not_found("movement bank is not found")
-    return exists
-
-
-def get_movement_bank(movement_bank_id: int, db: Session):
-    exists = db.query(MovementBank).filter(MovementBank.id==movement_bank_id).first()
-    if not exists:
-        raise_not_found("movement bank is not found")
-    return exists
-
-
-def get_information_for_movement_for_path(information_movement_id: int = Path(...),
-                                 db: Session = Depends(get_db)):
-    exists = db.query(InformationForMovement).filter(InformationForMovement.id==information_movement_id).first()
-    if not exists:
-        raise_bad_request("movement information is not found")
-    return exists
-
-
-def get_registration_daily_practice_for_path(registration_daily_practice_id: int = Path(...),
-                                             db: Session = Depends(get_db)):
-
-    exists = db.query(RegistrationDailyPractice).filter(RegistrationDailyPractice.id==registration_daily_practice_id).first()
-    if not exists:
-        raise_not_found("this not found")
-    return exists
-
-
-def build_daily_practice(daily_practice: DailyPractice):
-    exercise_program = daily_practice.exercise_program
-    return {
-        "title_session" : daily_practice.title_session,
-        "day_number": daily_practice.day_number,
-        "description": daily_practice.description,
-        "warm_up": daily_practice.warm_up,
-        "cardio":  daily_practice.cardio,
-        "cool_down": daily_practice.cool_down,
-        "created_date": daily_practice.created_date,
-        "update_date": daily_practice.update_date
-    }
-
-
-def build_daily_practice_with_information_practice(daily_practice: DailyPractice):
-    information_movement = daily_practice.movements_info
-    return {
-            "title_session" : daily_practice.title_session,
-            "day_number": daily_practice.day_number,
-            "description": daily_practice.description,
-            "warm_up": daily_practice.warm_up,
-            "cardio":  daily_practice.cardio,
-            "cool_down": daily_practice.cool_down,
-            "created_date": daily_practice.created_date,
-            "update_date": daily_practice.update_date,
-            "movement_info" : information_movement
-        }
-
-
-def build_information_movement(information_movement: InformationForMovement):
-    movement = information_movement.move_bank
-    return {
-        "move_name": information_movement.move_name,
-        "move_picture": information_movement.move_picture,
-        "link_video": information_movement.link_video,
-        "set_number": information_movement.set_number,
-        "number_of_repeat": information_movement.number_of_repeat,
-        "suggested_weight": information_movement.suggested_weight,
-        "practice_time": information_movement.practice_time,
-        "rest_time": information_movement.rest_time,
-        "tempo": information_movement.tempo,
-        "exercise_intensity": information_movement.exercise_intensity,
-        "description_coach": information_movement.description_coach,
-        "display_order": information_movement.display_order,
-        "alternate_move": information_movement.alternate_move,
-        "being_a_superset_or_a_dropset": information_movement.being_a_superset_or_a_dropset,
-        "guide_movement" : movement
-    }
-
-
-def build_registration_daily_practice(registration: RegistrationDailyPractice, db: Session):
-    information_for_movement = registration.movements_info
-    daily_practice = db.query(DailyPractice).filter(DailyPractice.id==information_for_movement.daily_practice_id).first()
-    return {
-        "done_status" : registration.done_status,
-        "done_date" : registration.done_date,
-        "actual_weight_used" : registration.actual_weight_used,
-        "actual_number_repeat" : registration.actual_number_repeat,
-        "difficulty_exercise" : registration.difficulty_exercise,
-        "time_practice" : registration.time_practice,
-        "description_for_coach" : registration.description_for_coach,
-        "problem_during_exercise" : registration.problem_during_exercise,
-        "information_for_movement" : information_for_movement,
-        "daily_practice" : daily_practice
-    }
-
-
+  
 # Exercise_Program
 
 @exercise_program_router.post("/create/{profile_id}", response_model=ExerciseProgramResponse)
@@ -185,6 +38,7 @@ def create_exercise_program(request: CreateExerciseProgram,
 
     check_admin(db, current_user, Permission.coach)
     coach = get_profile_coach(current_user.id, db)
+    check_active_coach(coach.id, db)
     accepted_coach_to_athlete(coach.id, athlete.id, db)
     new_program = ExerciseProgram.create(request.title_of_the_program, athlete.id, coach.id,
                                         request.purpose_of_the_program, request.start_date, request.end_date, 
@@ -211,6 +65,7 @@ def update_exercise_program(request: UpdateExerciseProgram,
     
     check_admin(db, current_user, Permission.coach)
     coach = get_profile_coach(current_user.id, db)
+    check_active_coach(coach.id, db)
     athlete = get_profile_athlete(athlete_id, db)
     accepted_coach_to_athlete(coach.id, athlete.id, db)
     program.update(request.title_of_the_program, request.purpose_of_the_program, request.start_date, request.end_date,
@@ -233,7 +88,33 @@ def delete_program(db: Session = Depends(get_db),
 
     check_admin(db, current_user, Permission.coach)
     coach = get_profile_coach(current_user.id, db)
+    check_active_coach(coach.id, db)
     athlete = get_profile_athlete(athlete_id, db)
+    if program.coach_id != coach.id:
+        raise_bad_request("you have not permission for this program")
+    accepted_coach_to_athlete(coach.id, athlete.id, db)
+    exists_daily_practice = db.query(DailyPractice).filter(DailyPractice.exercise_program_id==program.id).first()
+    if exists_daily_practice:
+        raise_bad_request("this program has daily practice")
+    db.delete(program)
+    db.commit()
+    return {
+        "detail" : "deleted successfully"
+    }
+
+
+@exercise_program_router.delete("/delete/with/all/daily/practice/{program_id}")
+def delete_program_with_all_daily_practice(db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user),
+                   athlete_id: int = Query(...),
+                   program: ExerciseProgram = Depends(get_exercise_program_for_path)):
+
+    check_admin(db, current_user, Permission.coach)
+    coach = get_profile_coach(current_user.id, db)
+    check_active_coach(coach.id, db)
+    athlete = get_profile_athlete(athlete_id, db)
+    if program.coach_id != coach.id:
+        raise_bad_request("you have not permission for this program")
     accepted_coach_to_athlete(coach.id, athlete.id, db)
     db.delete(program)
     db.commit()
@@ -242,12 +123,40 @@ def delete_program(db: Session = Depends(get_db),
     }
 
 
+
+# @exercise_program_router.delete("/delete/{program_id}")
+# def delete_program(db: Session = Depends(get_db),
+#                    current_user: User = Depends(get_current_user),
+#                    force_delete: bool = Query(False, description="اگر True باشد تمام تمرین‌های روزانه هم پاک می‌شوند"),
+#                    program: ExerciseProgram = Depends(get_exercise_program_for_path)):
+
+#     check_admin(db, current_user, Permission.coach)
+#     coach = get_profile_coach(current_user.id, db)
+    
+#     if program.coach_id != coach.id:
+#         raise_bad_request("you have not permission for this program")
+    
+#     if not force_delete:
+#         exists_daily_practice = db.query(DailyPractice).filter(DailyPractice.exercise_program_id == program.id).first()
+#         if exists_daily_practice:
+#             raise_bad_request("this program has daily practice. use force_delete=True to delete all.")
+
+#     db.delete(program)
+#     db.commit()
+    
+#     return {
+#         "detail": "deleted successfully"
+#     }
+
+
+
 @exercise_program_router.get("/get/one/{program_id}", response_model=ExerciseProgramResponse)
 def get_exercise_program_athlete(db: Session = Depends(get_db),
                          current_user: User = Depends(get_current_user),                    
                          program: ExerciseProgram = Depends(get_exercise_program_for_path)):
     check_admin(db, current_user, Permission.athlete)
     athlete = get_profile_athlete_with_user_id(current_user.id, db)
+    check_active_athlete(athlete.id, db)
     if program.athlete_id != athlete.id:
         raise_bad_request("this program is not for you")
     return program                                      
@@ -261,6 +170,7 @@ def get_all_for_one_athlete(limit: int = Query(20, ge=1, le=100),
     
     check_admin(db, current_user, Permission.athlete)
     athlete = get_profile_athlete_with_user_id(current_user.id, db)
+    check_active_athlete(athlete.id, db)
     programs = db.query(ExerciseProgram).filter(ExerciseProgram.athlete_id==athlete.id)
     total = programs.count()
     items = programs.order_by(ExerciseProgram.created_date.desc()).offset(offset).limit(limit).all()
@@ -279,6 +189,7 @@ def get_exercise_program_coach(db: Session = Depends(get_db),
                          program: ExerciseProgram = Depends(get_exercise_program_for_path)):
     check_admin(db, current_user, Permission.coach)
     coach = get_profile_coach(current_user.id, db)
+    check_active_coach(coach.id, db)
     if program.coach_id != coach.id:
         raise_bad_request("this program is not for you")
     return program  
@@ -294,6 +205,7 @@ def get_all_for_one_coach(limit: int = Query(20, ge=1, le=100),
     
     check_admin(db, current_user, Permission.coach)
     coach = get_profile_coach(current_user.id, db)
+    check_active_coach(coach.id, db)
     accepted_coach_to_athlete(coach.id, profile_thlete.id, db)
     programs = db.query(ExerciseProgram).filter(ExerciseProgram.athlete_id==profile_thlete.id,
                                                 ExerciseProgram.coach_id==coach.id)
@@ -318,6 +230,7 @@ def create_daily_practice(request: CreateProgramDaily,
     
     check_admin(db, current_user, Permission.coach)
     profile_coach = get_profile_coach(current_user.id, db)
+    check_active_coach(profile_coach.id, db)
     if program.coach_id != profile_coach.id:
         raise_bad_request("this program is not for you")
     new_daily_program = DailyPractice.create(program.id, request.title_session, request.day_number, request.description, request.warm_up,
@@ -337,6 +250,7 @@ def update_daily_practice(request: UpdateProgramDaily,
     
     check_admin(db, current_user, Permission.coach)
     profile_coach = get_profile_coach(current_user.id, db)
+    check_active_coach(profile_coach.id, db)
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != profile_coach.id:
         raise_bad_request("this program is not for you")
@@ -354,6 +268,7 @@ def delete_daily_practice(db: Session = Depends(get_db),
     
     check_admin(db, current_user, Permission.coach)
     profile_coach = get_profile_coach(current_user.id, db)
+    check_active_coach(profile_coach.id, db)
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if not program.coach_id != profile_coach.id:
         raise_bad_request("this program is not for you")
@@ -372,6 +287,7 @@ def get_one_for_athlete(db: Session = Depends(get_db),
 
     check_admin(db, current_user, Permission.athlete)
     profile_athlete = get_profile_athlete(current_user.id, db)
+    check_active_athlete(profile_athlete.id, db)
     program = db.query(ExerciseProgram).join(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if not program.athlete_id != profile_athlete.id:
         raise_bad_request("daily practice is not for you")
@@ -388,6 +304,7 @@ def get_all_for_athlete(limit: int = Query(20, ge=1, le=100),
 
     check_admin(db, current_user, Permission.athlete)
     profile_athlete = get_profile_athlete(current_user.id, db)
+    check_active_athlete(profile_athlete.id, db)
     if program.athlete_id != profile_athlete.id:
         raise_bad_request("this program is not for you")
     daily_practices = db.query(DailyPractice).join(ExerciseProgram).filter(DailyPractice.exercise_program_id==program.id)
@@ -406,6 +323,7 @@ def get_one_for_coach(db: Session = Depends(get_db),
 
     check_admin(db, current_user, Permission.coach)
     profile_coach = get_profile_coach(current_user.id, db)
+    check_active_coach(profile_coach.id, db)
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != profile_coach.id:
         raise_bad_request("this program is not foy you")
@@ -425,6 +343,7 @@ def get_all_for_coach(limit: int = Query(20, ge=1, le=100),
 
     check_admin(db, current_user, Permission.coach)
     profile_coach = get_profile_coach(current_user.id, db)
+    check_active_coach(profile_coach.id, db)
     if program.coach_id != profile_coach.id:
         raise_bad_request("this program is not for you")
     daily_practices = db.query(DailyPractice).join(ExerciseProgram).filter(DailyPractice.exercise_program_id==program.id)
@@ -474,23 +393,35 @@ def update_movement_bank(request: UpdateMovementBank,
 @movement_bank_router.delete("/delete/{movement_bank_id}")
 def delete_movement_bank(db: Session = Depends(get_db),
                          current_user: User = Depends(get_current_user),
-                         movement_bank: MovementBank = Depends(get_exercise_program_athlete)):
+                         movement_bank: MovementBank = Depends(get_movement_bank_for_path)):
 
     check_admin(db, current_user, Permission.club_manager)
-    db.delete(movement_bank)
-    db.commit()
-    return {
-        "detail" : "deleted successfully"
-    }
-
+    exists_information_for_movement = db.query(InformationForMovement).filter(
+        InformationForMovement.movement_bank_id == movement_bank.id
+    ).first()
+    if exists_information_for_movement:
+        movement_bank.active_status = ActiveStatusMovement.no.value
+        db.commit()
+        return {
+            "detail": "This movement is used in programs, so it was disabled instead of deleted."
+        }
+    else:
+        db.delete(movement_bank)
+        db.commit()
+        return {
+            "detail": "Movement deleted successfully"
+        }
+    
 
 @movement_bank_router.get("/get/one/{movement_bank_id}", response_model=MovementBankresponse)
-def get_one(db: Session = Depends(get_current_user),
+def get_one(db: Session = Depends(get_db),
             current_user: User = Depends(get_current_user),
             movement_bank: MovementBank = Depends(get_exercise_program_athlete)):
 
-    check_admin(db, current_user, Permission.athlete)
-    return movement_bank
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3, 4, 5):
+        return movement_bank
+
 
 
 @movement_bank_router.get("/get/all", response_model=MovementBankresponses)
@@ -499,16 +430,17 @@ def get_all(limit: int = Query(20, ge=1, le=100),
             db: Session = Depends(get_db),
             current_user: User = Depends(get_current_user)):
     
-    check_admin(db, current_user, Permission.athlete)
-    move = db.query(MovementBank)
-    total = move.count()
-    items = move.order_by(MovementBank.created_date.desc()).offset(offset).limit(limit).all()
-    return {
-        "items" : items,
-        "total" : total,
-        "limit" : limit,
-        "offset" : offset
-    }
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3, 4, 5):   
+        move = db.query(MovementBank)
+        total = move.count()
+        items = move.order_by(MovementBank.created_date.desc()).offset(offset).limit(limit).all()
+        return {
+            "items" : items,
+            "total" : total,
+            "limit" : limit,
+            "offset" : offset
+        }
 
 
 
@@ -524,6 +456,7 @@ def create_information_for_movement(request: CreateInformationForMovement,
 
     check_admin(db, current_user, Permission.coach)
     coach_profile = get_profile_coach(current_user.id, db)
+    check_active_coach(coach_profile.id, db)
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != coach_profile.id:
         raise_bad_request("this program is not for you")
@@ -545,8 +478,9 @@ def update_information_for_movement(request: UpdateMovementBank,
 
     check_admin(db, current_user, Permission.coach)
     coach_profile = get_profile_coach(current_user.id, db)
-    daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).frist()
-    program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.id).first()
+    check_active_coach(coach_profile.id, db)
+    daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
+    program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != coach_profile.id:
         raise_bad_request("this program is not for you")
     movement_info.update(request.move_name, request.move_picture, request.link_video, request.set_number,
@@ -554,7 +488,7 @@ def update_information_for_movement(request: UpdateMovementBank,
                         request.tempo, request.exercise_intensity,request.description_coach, request.display_order,
                         request.alternate_move, request.being_a_superset_or_a_dropset)
     db.commit()
-    db.refresh(movement_info)
+
     return movement_info
     
 
@@ -567,7 +501,8 @@ def delete_information_for_movement(db: Session = Depends(get_db),
 
     check_admin(db, current_user, Permission.coach)
     coach_profile = get_profile_coach(current_user.id, db)
-    daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).frist()
+    check_active_coach(coach_profile.id, db)
+    daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.id).first()
     if program.coach_id != coach_profile.id:
         raise_bad_request("this program is not for you")
@@ -583,13 +518,55 @@ def get_information_movement_with_daily_practice(db: Session = Depends(get_db),
                                                  current_user: User = Depends(get_current_user),
                                                  daily_practice: DailyPractice = Depends(get_daily_practice_for_path)):
 
-    check_admin(db, current_user, Permission.athlete)
-    athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-    program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-    if program.athlete_id != athlete_profile.id:
-        raise_bad_request("this program is not for you")
-    return build_daily_practice_with_information_practice(daily_practice)
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3):   
+        return build_daily_practice_with_information_practice(daily_practice)
+    elif user_role.role_id == 4:
+        coach = get_profile_coach(current_user.id, db)
+        check_active_coach(coach.id, db)
+        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+        accepted_coach_to_athlete(coach.id, program.athlete_id, db)
+        return build_daily_practice_with_information_practice(daily_practice)
+    elif user_role.role_id == 5:
+        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+        if program.athlete_id != athlete_profile.id:
+            raise_bad_request("this program is not for you")
+        return build_daily_practice_with_information_practice(daily_practice)
+    else:
+        return {
+            "detail" : "you have not permission"
+        }
 
+
+
+@information_for_movement_router.get("/get/all/information/for/movement/{daily_practice_id}", response_model=InformationForMovementResponses)
+def get_all_information_for_movement(limit: int = Query(20, ge=1, le=100),
+                                     offset: int = Query(0, ge=0),
+                                     db: Session = Depends(get_db),
+                                     current_user: User = Depends(get_current_user),
+                                     daily_practice: DailyPractice = Depends(get_daily_practice_for_path)):
+
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3):
+        return build_get_all_information_for_movement(limit, offset, daily_practice, db)
+    elif user_role.role_id == 4:
+        coach = get_profile_coach(current_user.id, db)
+        check_active_coach(coach.id, db)
+        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+        accepted_coach_to_athlete(coach.id, program.athlete_id, db)
+        return build_get_all_information_for_movement(limit, offset, daily_practice, db)
+    elif user_role.role_id == 5:
+        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+        check_active_athlete(athlete_profile.id, db)
+        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+        if program.athlete_id != athlete_profile.id:
+            raise_bad_request("this program is not for you")
+        return build_get_all_information_for_movement(limit, offset, daily_practice, db)
+    else:
+        return {
+            "detail" : "you have not permision"
+        }
 
 
 
@@ -599,18 +576,28 @@ def get_information_movement_with_movement_guide(db: Session = Depends(get_db),
                                                  current_user: User = Depends(get_current_user),
                                                  movement_info: InformationForMovement = Depends(get_information_for_movement_for_path)):
 
-    check_admin(db, current_user, Permission.athlete)
-    athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-    daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
-    if not daily_practice:
-        raise_not_found("is not found")
-    program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-    if not program:
-        raise_not_found("is not found")
-    if not athlete_profile.id != program.athlete_id:
-        raise_bad_request("you cat not see guide movement")
-    return build_information_movement(movement_info)
-
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3):
+        return build_information_movement(movement_info)
+    elif user_role.role_id == 4:
+        coach_profile = get_profile_coach(current_user.id, db)
+        check_active_coach(coach_profile.id, db)
+        daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
+        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+        if program.coach_id != coach_profile.id:
+            raise_bad_request("you cat not see guide movement becouse this program is not for you")
+    elif user_role.role_id == 5:
+        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+        check_active_athlete(athlete_profile.id, db)
+        daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
+        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+        if athlete_profile.id != program.athlete_id:
+            raise_bad_request("you cat not see guide movement")
+        return build_information_movement(movement_info)
+    else:
+        return {
+            "detail" : "you have not permission"
+        }
 
 
 
@@ -629,7 +616,8 @@ def create_registration_daily_practice(request: CreateRegistrationDailyPractice,
 
     check_admin(db, current_user, Permission.athlete)
     athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-    if not information_movement.daily_practice != daily_practice.id:
+    check_active_athlete(athlete_profile.id, db)
+    if information_movement.daily_practice != daily_practice.id:
         raise_bad_request("this daily pracrice is not for this information for movement")
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.athlete_id != athlete_profile.id:
@@ -652,7 +640,8 @@ def update_registration_daily_practice(request: UpdateRegistrationDailyPractice,
 
     check_admin(db, current_user, Permission.athlete)
     athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-    if registration.athlete_id != athlete_profile:
+    check_active_athlete(athlete_profile.id, db)
+    if registration.athlete_id != athlete_profile.id:
         raise_bad_request("this registration is not for you")
     registration.update(request.done_status, request.done_date,request.actual_weight_used, request.actual_number_repeat, 
                         request.difficulty_exercise, request.time_practice, request.description_for_coach, request.problem_during_exercise)
@@ -663,19 +652,37 @@ def update_registration_daily_practice(request: UpdateRegistrationDailyPractice,
 
 
 @registration_daily_practice_router.delete("/delete/{registration_daily_practice_id}")
-def update_registration_daily_practice(db: Session = Depends(get_db),
+def delete_registration_daily_practice(db: Session = Depends(get_db),
                                        current_user: User = Depends(get_current_user),
                                        registration: RegistrationDailyPractice = Depends(get_registration_daily_practice_for_path)):
 
-    check_admin(db, current_user, Permission.athlete)
-    athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-    if not registration.athlete_id != athlete_profile:
-        raise_bad_request("this registration is not for you")
-    db.delete(registration)
-    db.commit()
-    return {
-        "detail" : "deleted successfully"
-    }
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3):
+            db.delete(registration)
+            db.commit()
+            return {
+                "detail" : "deleted successfully"
+            }   
+    elif user_role.role_id == 4:
+        coach_profile = get_profile_coach(current_user.id, db)
+        check_active_coach(coach_profile.id, db)
+        accepted_coach_to_athlete(coach_profile.id, registration.athlete_id, db)
+        db.delete(registration)
+        db.commit()
+        return {
+            "detail" : "deleted successfully"
+        }
+    else:
+        check_admin(db, current_user, Permission.athlete)
+        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+        check_active_athlete(athlete_profile.id, db)
+        if registration.athlete_id != athlete_profile.id:
+            raise_bad_request("this registration is not for you")
+        db.delete(registration)
+        db.commit()
+        return {
+            "detail" : "deleted successfully"
+        }
 
 
 @registration_daily_practice_router.get("/get/{registration_daily_practice_id}")
@@ -688,12 +695,14 @@ def get_registration_daily_practice_router(db: Session = Depends(get_db),
     if user_role.role_id == 3:
         return build_registration_daily_practice(registration, db)
     if user_role.role_id == 4:
-        coach_profile = get_profile_athlete_with_user_id(current_user.id, db)
+        coach_profile = get_profile_coach(current_user.id, db)
+        check_active_coach(coach_profile.id, db)
         athlete_profile = registration.athlete_id
         accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
         return build_registration_daily_practice(registration, db)
     if user_role.role_id == 5:
         athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+        check_active_athlete(athlete_profile.id, db)
         if registration.athlete_id != athlete_profile.id:
             raise_bad_request("this registration is not for you")
         return build_registration_daily_practice(registration, db)

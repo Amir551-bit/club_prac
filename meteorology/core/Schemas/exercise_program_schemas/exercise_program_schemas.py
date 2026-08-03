@@ -231,6 +231,14 @@ class InformationForMovementResponse(BaseModel):
         model_config = ConfigDict(from_attributes=True)
 
 
+class InformationForMovementResponses(BaseModel):
+        items: list[InformationForMovementResponse]
+        total: int
+        limit: int
+        offset: int
+        daily_practice: ProgramDailyResponse
+
+
 
 # Registration_Daily_Practice
 
@@ -284,5 +292,5 @@ class CreateNotification(BaseModel):
     title: str
     text: str
     type: NotificationsRequiredEnum
-    read_status: bool
+    read_status: bool = False
 

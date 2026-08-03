@@ -29,7 +29,7 @@ class ProgressProcess(Base):      # روند پیشرفت
 
     coach = relationship("ProfileCoach", back_populates="progress")
     athlete = relationship("ProfileAthlete", back_populates="progress")
-    picture_progress = relationship("ProgressPicture", back_populates="progress")
+    picture_progress = relationship("ProgressPicture", back_populates="progress", cascade="all, delete-orphan")
 
 
     @classmethod

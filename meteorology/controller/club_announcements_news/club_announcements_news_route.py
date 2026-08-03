@@ -11,8 +11,8 @@ from core.Models.role.permission import Permission
 from core.Models.profile.profile_athlete_model import ProfileAthlete
 from core.Models.profile.profile_coach_model import ProfileCoach
 from controller.exercise_program_route.exercise_program_route import accepted_coach_to_athlete, get_profile_coach, get_profile_athlete_with_user_id
-
-
+from core.Models.notification_system.notification_system_model import NotificationSystem
+from core.Schemas.notification_system.notification_system_schemas import CreateNotification
 
 club_announcements_news_router = APIRouter(prefix="/club/announcements/news", tags=["club_announcements_new"])
 
@@ -29,11 +29,12 @@ def get_club_announcements_news_for_path(club_announcements_news_id: int = Path(
 
 @club_announcements_news_router.post("/create", response_model=ClubAnnouncementsNewResponse)
 def create(request: CreateClubAnnouncementsNew,
+           requests: CreateNotification,
            db: Session = Depends(get_db),
            current_user: User = Depends(get_current_user)):
     
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if not (user_role.role_id == 1 or user_role.role_id == 2 or user_role.role_id == 3 or user_role.role_id == 4):
+    if not user_role or user_role.role_id not in (1, 2, 3, 4):
         raise_bad_request("you have not permission")
 
     new = ClubAnnouncementsNews.create(request.title, request.text, request.image, request.notification_type,
@@ -42,6 +43,19 @@ def create(request: CreateClubAnnouncementsNew,
     db.add(new)
     db.commit()
     db.refresh(new)
+    if user_role.role_id in (1, 2, 3) and request.audience == 4:
+        profiles_id = db.query(ProfileAthlete.id).all()
+        notifications_list = []
+        for profile_id in profiles_id:
+            new_notif = NotificationSystem.create(
+                profile_id[0],
+                requests.type, 
+                requests.title, 
+                requests.text, 
+                requests.read_status)
+            notifications_list.append(new_notif)
+        db.add_all(notifications_list)
+        db.commit()
     return new
 
 
@@ -53,7 +67,7 @@ def update(request: UpdateClubAnnouncementsNew,
            club_noti: ClubAnnouncementsNews = Depends(get_club_announcements_news_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if not (user_role.role_id == 2 or user_role.role_id == 3 or club_noti.author == current_user.id):
+    if not (user_role.role_id == 1 or user_role.role_id == 2 or user_role.role_id == 3 or club_noti.author == current_user.id):
         raise_bad_request("validation problem")
     club_noti.update(request.title, request.text, request.image, request.notification_type, request.importance,
                      request.audience, request.publication_date, request.expiration_date, request.release_status,
@@ -92,7 +106,11 @@ def get_one(db: Session = Depends(get_db),
         if user_role.role_id == 4 or user_role.role_id == 3 or user_role.role_id == 2:
             return club_noti
     elif club_noti.audience == 4:
+        user_id = club_noti.author
+        user_roles = db.query(UserRole).filter(UserRole.user_id==user_id).first()
         if club_noti.author == current_user.id or user_role.role_id == 3 or user_role.role_id == 2:
+            return club_noti
+        elif user_roles.role_id == 2 or user_roles.role_id == 3:
             return club_noti
         else:
             user_coach = club_noti.author

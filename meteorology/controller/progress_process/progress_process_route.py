@@ -7,107 +7,21 @@ from core.Schemas.progress_process_schema.progress_process_schema import *
 from core.Models.user.user_model import User
 from core.Models.role.permission import Permission
 from core.Models.user_role.user_role_model import UserRole
-from controller.exercise_program_route.exercise_program_route import (accepted_coach_to_athlete, get_profile_athlete_with_user_id,
-                                                                      get_profile_athlete, get_profile_coach, get_profile_athlete_for_path)
 from core.Models.profile.profile_athlete_model import ProfileAthlete
 from core.Models.profile.profile_coach_model import ProfileCoach
 from core.execptions.execption import raise_bad_request, raise_forbidden, raise_not_found
 from core.Models.connection_coach_to_athlete.coach_to_athlete import CoachAthleteConnection
+from controller.service.services import (accepted_coach_to_athlete, get_profile_athlete_with_user_id, get_profile_coach,
+                                         get_profile_athlete_for_path, get_progress_process_for_path, get_progress_picture_for_path,
+                                         get_progress_process_and_check_athlete, get_progress_process_and_check_coach,
+                                         build_progress_process, build_progress_process_all, build_progress_picture_one,
+                                            )
 
 
 progress_process_router = APIRouter(prefix="/progress/process", tags=["progress_process"])
 progress_picture_router= APIRouter(prefix="/progress/picture", tags=["progress_picture"])
-
-
-def get_progress_process_for_path(progress_process_id: int = Path(...),
-                                  db: Session = Depends(get_db)):
-
-    exists = db.query(ProgressProcess).filter(ProgressProcess.id==progress_process_id).first()
-    if not exists:
-        raise_not_found("this not found")
-    return exists
-
-
-def get_progress_picture_for_path(progress_picture_id: int = Path(...),
-                         db: Session = Depends(get_db)):
-
-    exists = db.query(ProgressPicture).filter(ProgressPicture.id==progress_picture_id).first()
-    if not exists:
-        raise_not_found("this not found")
-    return exists
-
-
-def get_progress_process_and_check_coach(progress_picture: ProgressPicture, coach_profile: ProfileCoach, db: Session):
-    progress_process = db.query(ProgressProcess).filter(ProgressProcess.id==progress_picture.progress_process_id).first()
-    if progress_process.data_recorder_coach != coach_profile.id:
-        raise_bad_request("identification error")
-    return progress_process
-
-
-def get_progress_process_and_check_athlete(progress_picture: ProgressPicture, athlete_profile: ProfileAthlete, db: Session):
-    progress_process = db.query(ProgressProcess).filter(ProgressProcess.id==progress_picture.progress_process_id).first()
-    if progress_process.athlete_id != athlete_profile.id:
-        raise_bad_request("identification error")
-    return progress_process
-
-
-def build_progress_process(progress_process: ProgressProcess):
-    athlete_profile = progress_process.athlete
-    return {
-        "athlete_id" : progress_process.athlete_id,
-        "date_measurement" : progress_process.date_measurement,
-        "data_recorder_coach" : progress_process.data_recorder_coach,
-        "weight" : progress_process.weight,
-        "fat_percentage" : progress_process.fat_percentage,
-        "around_neck" : progress_process.around_neck,
-        "around_chest" : progress_process.around_chest,
-        "around_arm" : progress_process.around_arm,
-        "waist_circumference" : progress_process.waist_circumference,
-        "abdominal_circumference" : progress_process.abdominal_circumference,
-        "around_thigh" : progress_process.around_thigh,
-        "leg_circumference" : progress_process.leg_circumference,
-        "description" : progress_process.description,
-        "created_date" : progress_process.created_date,
-        "update_date" : progress_process.update_date,
-        "athlete_profile" : athlete_profile
-    }
-
-
-def build_progress_process_all(profile_athlete: ProfileAthlete, limit: int, offset: int, db: Session):
-
-    progress_process = db.query(ProgressProcess).filter(ProgressProcess.athlete_id==profile_athlete.id)
-    coach_to_athlete = db.query(CoachAthleteConnection).filter(CoachAthleteConnection.profile_athlete_id==profile_athlete.id).first()
-    profile_coach = coach_to_athlete.coach
-    total = progress_process.count()
-    items = progress_process.order_by(ProgressProcess.created_date.asc()).offset(offset).limit(limit).all()
-    return {
-        "items" : items,
-        "total" : total,
-        "limit" : limit,
-        "offset" : offset,
-        "profile_athlete" : profile_athlete,
-        "profile_coach" : profile_coach
-    }
-
-
-
-
-def build_progress_picture_one(progress_picture: ProgressPicture):
-    progress_process = progress_picture.progress
-    return {
-       "progress_process_id" : progress_picture.progress_process_id,
-       "date_registration" : progress_picture.date_registration,
-       "front_view" : progress_picture.front_view,
-       "side_view" : progress_picture.side_view,
-       "back_view" :  progress_picture.back_view,
-       "description" : progress_picture.description,
-       "data_recorder_coach" : progress_picture.data_recorder_coach,
-       "data_recorder_athlete" : progress_picture.data_recorder_coach,
-       "progress_process" : progress_process
-    }
-
-
-
+ 
+ 
 
 @progress_process_router.post("/create/{profile_id}", response_model=ProgressProcessResponse)
 def create_progress_process(request: CreateProgressProcess,
@@ -144,6 +58,29 @@ def update_progress_process(request: UpdateProgressProcess,
     return progress_process
 
 
+@progress_process_router.delete("/delete/{progress_process_id}")
+def delete_progress_process(db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_user),
+                            progress: ProgressProcess = Depends(get_progress_process_for_path)):
+
+    user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    if user_role.role_id in (1, 2, 3):
+        db.delete(progress)
+        db.commit()
+        return {
+            "detail" : "deleted successfully"
+        }
+    elif user_role.role_id == 4:
+        profile_coach = get_profile_coach(current_user.id, db)
+        if profile_coach.id != progress.data_recorder_coach:
+            raise_bad_request("this progress process is not for you")
+        db.delete(progress)
+        db.commit()
+        return {
+            "detail" : "deleted successfully"
+        }
+    else:
+        raise_bad_request("you have not permission")
 
 
 @progress_process_router.get("/get/one/{progress_process_id}", response_model=ProgressProcessResponseForOne)
@@ -251,7 +188,7 @@ def delete_progress_picture(db: Session = Depends(get_db),
     
     check_admin(db, current_user, Permission.coach)
     coach_profile = get_profile_coach(current_user.id, db)
-    progress_process = get_progress_process_and_check_coach(progress_picture, coach_profile, db)
+    get_progress_process_and_check_coach(progress_picture, coach_profile, db)
     db.delete(progress_picture)
     db.commit()
     return {

@@ -12,51 +12,17 @@ from core.Models.role.permission import Permission
 from core.Schemas.profile.profile_athlete import ProfileAthleteResponse
 from controller.profile_coach.profile_coach_route import get_profile_coach_for_path
 from core.Models.notification_system.notification_system_model import NotificationSystem
-
+from core.Models.Exercise_program.exercise_program import ExerciseProgram
+from core.Models.meal_plan.meal_plan import MealPlan
+from core.Models.meal_plan.meal_plan_enum import MealStatus
+from core.Models.Exercise_program.exercise_program_enum import ProgramStatus
+from core.Models.measurement_and_progress.progress_process import ProgressPicture, ProgressProcess
+from controller.service.services import (get_coach_to_athlete_for_path, get_profile_athlete_or_404,
+                                          get_profile_coach_or_404, build_get_response_coach_to_athlete)
 
 coach_to_athlete_router = APIRouter(prefix="/coach/to/athlete", tags=["coach_to_athlete"])
 
-
-def get_profile_athlete_or_404(profile_id: int,
-                                 db: Session = Depends(get_db)):
-    exists = db.query(ProfileAthlete).filter(ProfileAthlete.id==profile_id).first()
-    if not exists:
-        raise_not_found("profile is not found")
-    return exists
-
-def get_profile_coach_or_404(profile_id: int,
-                               db: Session = Depends(get_db)):
-    
-    exists = db.query(ProfileCoach).filter(ProfileCoach.id==profile_id).first()
-    if not exists:
-        raise_not_found("profile coach is not found")
-    return exists
-
-
-def get_coach_to_athlete_for_path(id: int = Path(...),
-                                  db: Session = Depends(get_db)):
-
-    exists = db.query(CoachAthleteConnection).filter(CoachAthleteConnection.id==id).first()
-    if not exists:
-        raise_not_found("is not found")
-    return exists
-
-
-def build_get_response_coach_to_athlete(connect: CoachAthleteConnection):
-
-    profile_athlete = connect.athlete
-    return {
-        "profile_coach_id": connect.profile_coach_id,
-        "profile_athlete_id": connect.profile_athlete_id,
-        "start_date": connect.start_date,
-        "status": connect.status,
-        "coach_role": connect.coach_role,
-        "manager_notes": connect.manager_notes,
-        "end_date": connect.end_date,
-        "profile_athlete" : profile_athlete
-    }
-
-
+  
 @coach_to_athlete_router.post("/create", response_model=CoachToAthleteResponse)
 def create_coach_to_athlete(request: CreateCoachToAthlete,
                             db: Session = Depends(get_db),
@@ -122,10 +88,21 @@ def delete_coach_to_athlete(db: Session = Depends(get_db),
     check_admin(db, current_user, Permission.club_manager)
     fullname_athlete = f"{connect.athlete.first_name} {connect.athlete.last_name}"
     fullname_coach = f"{connect.coach.first_name} {connect.coach.last_name}"
+    exercise_program_exists = db.query(ExerciseProgram).filter(ExerciseProgram.athlete_id==connect.profile_athlete_id,
+                                                               ExerciseProgram.coach_id==connect.profile_coach_id,
+                                                               ExerciseProgram.program_status!=ProgramStatus.cancelled.value).first()
+    meal_plan_exists = db.query(MealPlan).filter(MealPlan.athlete_id==connect.profile_athlete_id,
+                                                 MealPlan.coach_id==connect.profile_coach_id,
+                                                 MealPlan.status!=MealStatus.cancelled.value).first()
+    if exercise_program_exists or meal_plan_exists:
+        raise_bad_request("you can not delete because meal plan and exercise program is exists")
+    progress_process_ids = db.query(ProgressProcess.id).filter(ProgressProcess.athlete_id==connect.profile_athlete_id).subquery()
+    db.query(ProgressPicture).filter(ProgressPicture.progress_process_id.in_(progress_process_ids)).delete(synchronize_session=False)
+    db.query(ProgressProcess).filter(ProgressProcess.athlete_id==connect.profile_athlete_id).delete(synchronize_session=False)
     db.delete(connect)
     db.commit()
     return {
-        "detail" : f"ahtlete {fullname_athlete} for coach {fullname_coach} is deleted"
+        "detail" : f"athlete {fullname_athlete} for coach {fullname_coach} is deleted"
     }
 
 

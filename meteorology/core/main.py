@@ -17,6 +17,7 @@ from core.Models.role.role_model import Role
 from core.Models.user_role.user_role_model import UserRole
 from core.Models.user.user_model import User
 from core.Models.club_announcements_and_news.club_announcements_news_model import ClubAnnouncementsNews
+from core.Models.notification_system.notification_system_model import NotificationSystem
 
 
 from controller.user.user_route import user_route
@@ -40,6 +41,7 @@ from controller.meal_plan.meal_plan_route import food_item_router
 from controller.progress_process.progress_process_route import progress_process_router
 from controller.progress_process.progress_process_route import progress_picture_router
 from controller.club_announcements_news.club_announcements_news_route import club_announcements_news_router
+from controller.notification.notification_route import notification_router
 
 
 Base.metadata.create_all(bind=engine)
@@ -79,6 +81,7 @@ app.include_router(food_item_router)
 app.include_router(progress_process_router)
 app.include_router(progress_picture_router)
 app.include_router(club_announcements_news_router)
+app.include_router(notification_router)
 
 
 @app.get("/")

@@ -162,4 +162,4 @@ class CreateNotification(BaseModel):
     title: str
     text: str
     type: NotificationsRequiredEnum
-    read_status: bool
+    read_status: bool = False

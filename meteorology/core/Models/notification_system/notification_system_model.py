@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Integer, func, Date, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from sqlite.database import Base
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from core.Models.notification_system.notification_system_enum import NotificationsRequiredEnum
 
 
@@ -33,3 +33,10 @@ class NotificationSystem(Base):
         instance.type = type.value
         instance.read_status = read_status
         return instance
+
+
+
+    def read_notification(self):
+        if self.read_status == False:
+            self.read_status = True
+            self.date_read = datetime.now(timezone.utc)

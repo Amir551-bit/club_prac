@@ -50,6 +50,10 @@ class ProfileCoachResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ChangeStatusCoach(BaseModel):
+    status: CooperationStatusForCoach
+
+
 
 class ProfileCoachResponses(BaseModel):
     items : list[ProfileCoachResponse]
@@ -70,7 +74,6 @@ class UpdateCoachSpecialties(BaseModel):
 
 
 class SpecialtiesResponse(BaseModel):
-    id: int
     profile_id: int
     specialties: SpecialtiesEnum
 
