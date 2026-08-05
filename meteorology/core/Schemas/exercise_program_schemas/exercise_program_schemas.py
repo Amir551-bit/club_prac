@@ -93,12 +93,10 @@ class ProgramDailyResponse(BaseModel):
         model_config = ConfigDict(from_attributes=True)
 
 
-class ProgramDailyResponseForOne(BaseModel):
-        daily_practice: ProgramDailyResponse
+class ProgramDailyResponseForOne(ProgramDailyResponse):
         exercise_program: ExerciseProgramResponse
 
-        model_config = ConfigDict(from_attributes=True)
-
+        
 
 class ProgramDailyResponses(BaseModel):
         items: list[ProgramDailyResponse]

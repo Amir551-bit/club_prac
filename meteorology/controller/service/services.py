@@ -161,9 +161,10 @@ def get_registration_daily_practice_for_path(registration_daily_practice_id: int
     return exists
 
 
-def build_daily_practice(daily_practice: DailyPractice):
+def build_daily_practice(daily_practice: DailyPractice, total: int):
     exercise_program = daily_practice.exercise_program
     return {
+        "exercise_program_id" : exercise_program.id,
         "title_session" : daily_practice.title_session,
         "day_number": daily_practice.day_number,
         "description": daily_practice.description,
@@ -171,7 +172,7 @@ def build_daily_practice(daily_practice: DailyPractice):
         "cardio":  daily_practice.cardio,
         "cool_down": daily_practice.cool_down,
         "created_date": daily_practice.created_date,
-        "update_date": daily_practice.update_date
+        "update_date": daily_practice.update_date,
     }
 
 

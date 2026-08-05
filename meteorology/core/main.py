@@ -42,7 +42,8 @@ from controller.progress_process.progress_process_route import progress_process_
 from controller.progress_process.progress_process_route import progress_picture_router
 from controller.club_announcements_news.club_announcements_news_route import club_announcements_news_router
 from controller.notification.notification_route import notification_router
-
+from controller.register_working_hours.register_working_hours_router import register_working_hour_router
+from sqlite.redis_client import redis_client
 
 Base.metadata.create_all(bind=engine)
 
@@ -52,10 +53,14 @@ async def lifespan(app: FastAPI):
     try:
         seeds_role()
         create_admin()
+        redis_client.ping()
+        print("Connected to redis successfully")
     except Exception as e:
         print(f"❌ Error while seeding roles: {e}")
+        print(f"Failed to connect to Redis: {e}")
     yield
     print("Server is shutting down...")
+    redis_client.close()
 
 # 🟢 ۲. اضافه کردن دپندسی سراسری برای فعال شدن دکمه Authorize در بالای Swagger
 app = FastAPI(lifespan=lifespan)
@@ -82,6 +87,7 @@ app.include_router(progress_process_router)
 app.include_router(progress_picture_router)
 app.include_router(club_announcements_news_router)
 app.include_router(notification_router)
+app.include_router(register_working_hour_router)
 
 
 @app.get("/")
