@@ -53,6 +53,8 @@ class ProfileAthleteResponse(BaseModel):
     the_main_trainer: str 
     management_description: str | None = None 
     emergency_contact_number_if_needed: str | None = None 
+    created_date: datetime
+    update_date: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

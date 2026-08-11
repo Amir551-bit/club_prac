@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, func, Date, ForeignKey
+from sqlalchemy import Column, String, Integer, func, Date, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlite.database import Base
 from core.Models.profile.profile_enum import MembershipStatusForAthlete
@@ -26,6 +26,8 @@ class ProfileAthlete(Base):
     management_description = Column(String(1500), nullable=True)
     emergency_contact_number_if_needed = Column(String(11), nullable=True)
 
+    created_date = Column(DateTime, server_default=func.now())
+    update_date = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
 
     users = relationship("User", back_populates="athlete")
     sports_info = relationship("AthleteSportsInfo", back_populates="athlete")
@@ -99,9 +101,7 @@ class AthleteSportsInfo(Base):
     __tablename__ = "athlete_sports_info"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-
     athlete_id = Column(Integer, ForeignKey("profile_athlete.id"), nullable=False)
-
     main_goal = Column(Integer, nullable=False)             # هدف اصلی
     sport_level = Column(String(100), nullable=True)           # سطح ورزشی
     workout_experience = Column(String(255), nullable=True)    # سابقه تمرین
@@ -113,6 +113,8 @@ class AthleteSportsInfo(Base):
     supplements_consumed = Column(String(1000), nullable=True) # مکمل‌های مصرفی
     coach_notes = Column(String(2000), nullable=True)          # یادداشت مربی
 
+    created_date = Column(DateTime, server_default=func.now())
+    update_date = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
     # رابطه معکوس برای دسترسی راحت از این جدول به جدول پایه
     athlete = relationship("ProfileAthlete", back_populates="sports_info")
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, func, Date, ForeignKey, Boolean, Text, Time
+from sqlalchemy import Column, String, Integer, func, Date, ForeignKey, Boolean, Text, Time, DateTime
 from sqlalchemy.orm import relationship
 from sqlite.database import Base
 from datetime import datetime, date, time
@@ -21,6 +21,9 @@ class MealPlan(Base):
     target_calories_needed = Column(Integer, nullable=True)
     description = Column(Text, nullable=True)
     status = Column(Integer, nullable=False)
+
+    created_date = Column(DateTime, server_default=func.now())
+    update_date = Column(DateTime, server_default=func.now(), server_onupdate=func.now())
     
     meal_daily = relationship("MealPlanDaily", back_populates="meal_plans", cascade="all, delete-orphan")
     coach = relationship("ProfileCoach", back_populates="meal_plans")

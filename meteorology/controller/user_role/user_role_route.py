@@ -41,7 +41,7 @@ def get_all(limit: int = Query(20, ge=1, le=100),
     return {
         "items" : [build_for_user_role(item) for item in items],
         "total" : total
-        }
+    }
 
 
 @user_role_router.get("/get/{user_id}", response_model=UserRoleResponse)
@@ -52,6 +52,3 @@ def get_one(db: Session = Depends(get_db),
     check_admin(db, current_user, Permission.club_owner)
     user_role = get_user_role_or_404(user.id, db)
     return user_role
-
-
-    

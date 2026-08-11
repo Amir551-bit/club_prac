@@ -360,6 +360,17 @@ def build_food_item_with_meal_plan_daily_all(limit: int, offset: int, meal_plan_
         }
 
 
+def build_get_all_meal_plan(limit: int, offset: int, athlete_profile: ProfileAthlete, db: Session):
+    meals = db.query(MealPlan).filter(MealPlan.athlete_id==athlete_profile.id)
+    total = meals.count()
+    items = meals.order_by(MealPlan.created_date.desc()).offset(offset).limit(limit).all()
+    return {
+        "items": items,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "athlete_profile": athlete_profile
+    }
 
 # notification 
 
@@ -540,4 +551,35 @@ def build_for_user_role(user_role: UserRole):
         "user_id" : user_role.user_id,
         "role_id" : user_role.role_id,
         "name_role" : name_role
+    }
+
+
+# notificatios
+
+
+def build_all_notifications_is_read(limit: int, offset: int, athlete_profile: ProfileAthlete, db: Session):
+    notifications = db.query(NotificationSystem).filter(NotificationSystem.recipient==athlete_profile.id,
+                                                        NotificationSystem.read_status==True)
+    total = notifications.count()
+    items = notifications.order_by(NotificationSystem.created_date.desc()).offset(offset).limit(limit).all()
+    return {
+        "items" : items,
+        "total" : total,
+        "limit" : limit,
+        "offset" : offset,
+        "profile_athlete" : athlete_profile
+    }
+
+
+def build_all_notifications_not_read(limit: int, offset: int, athlete_profile: ProfileAthlete, db: Session):
+    notifications = db.query(NotificationSystem).filter(NotificationSystem.recipient==athlete_profile.id,
+                                                        NotificationSystem.read_status==False)
+    total = notifications.count()
+    items = notifications.order_by(NotificationSystem.created_date.desc()).offset(offset).limit(limit).all()
+    return {
+        "items" : items,
+        "total" : total,
+        "limit" : limit,
+        "offset" : offset,
+        "profile_athlete" : athlete_profile
     }

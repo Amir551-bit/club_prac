@@ -1,0 +1,19 @@
+How to use threading.Lock instead of locking using a redis key with a TTL
+
+__init__
+
+match case instead of if-elif
+
+set instead of tuples
+
+Move simple checkers to di
+
+Dependency injection // read about this matter
+
+Use BaseModel responses instead of raw dict return from route functions
+
+Make redis key names shorter
+
+Redis hash-maps // read about this
+
+asyncio.Event, asyncio.Lock, asyncio.Semaphore // read about it

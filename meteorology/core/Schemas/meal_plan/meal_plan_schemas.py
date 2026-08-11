@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from core.Models.meal_plan.meal_plan_enum import MealStatus, Meals
 from datetime import date, datetime, time
 from core.Models.notification_system.notification_system_enum import NotificationsRequiredEnum
+from core.Schemas.profile.profile_athlete import ProfileAthleteResponse
 
 # Meal_Plan
 
@@ -47,6 +48,14 @@ class MealPlanResponse(BaseModel):
     description: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MealPlanResponses(BaseModel):
+    items: list[MealPlanResponse]
+    total: int
+    limit: int
+    offset: int
+    athlete_profile: ProfileAthleteResponse
 
 
 

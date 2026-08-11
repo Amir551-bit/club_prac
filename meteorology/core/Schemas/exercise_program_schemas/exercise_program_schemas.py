@@ -104,6 +104,10 @@ class ProgramDailyResponses(BaseModel):
         program: ExerciseProgramResponse
 
 
+class ProgramDailyWithInformationForMovement(ProgramDailyResponse):
+        information_for_movement: InformationForMovementResponse
+
+
 # MovementBunk
 
 
@@ -235,6 +239,12 @@ class InformationForMovementResponses(BaseModel):
         limit: int
         offset: int
         daily_practice: ProgramDailyResponse
+
+
+
+class InformationForMovementGuideResponse(InformationForMovementResponse):
+        guide_movement: MovementBankresponse
+
 
 
 

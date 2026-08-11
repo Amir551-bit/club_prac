@@ -20,7 +20,7 @@ class NotificationResponse(BaseModel):
     text: str
     type: NotificationsRequiredEnum
     read_status: bool
-    date_read: datetime
+    date_read: datetime | None = None
     created_date: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -20,6 +20,9 @@ from controller.service.services import (get_profile_coach, get_profile_athlete_
                                          get_registration_daily_practice_for_path, build_daily_practice, build_daily_practice_with_information_practice,
                                          build_information_movement, build_registration_daily_practice, build_get_all_information_for_movement)
 from sqlite.redis_client import redis_client
+from controller.service.db_helper import (create_or_update_to_api_redis, commit, update, delete,
+                                           commit_notification, get_for_redis)
+from core.Models.notification_system.notification_system_enum import NotificationsRequiredEnum
 import json
 
 
@@ -66,12 +69,11 @@ def build_get_all_daily_practice(limit: int, offset: int, program: ExerciseProgr
         "total" : total,
         "program" : program
     }
-  
+
 # Exercise_Program
 
 @exercise_program_router.post("/create/{profile_id}", response_model=ExerciseProgramResponse)
 def create_exercise_program(request: CreateExerciseProgram,
-                            requests: CreateNotification,
                             db: Session = Depends(get_db),
                             current_user: User = Depends(get_current_user),
                             athlete: ProfileAthlete = Depends(get_profile_athlete_for_path)):
@@ -80,60 +82,44 @@ def create_exercise_program(request: CreateExerciseProgram,
     coach = get_profile_coach(current_user.id, db)
     check_active_coach(coach.id, db)
     accepted_coach_to_athlete(coach.id, athlete.id, db)
-    locked_key = f"lock:create_program:{current_user.id}:{athlete.id}"
-
-    is_locked = redis_client.set(locked_key, "locked", ex=6, nx=True)
-    if not is_locked:
-        raise_bad_request("درخواست شما در حال پردازش است، لطفاً کمی صبر کنید.")
-    try:
-        new_program = ExerciseProgram.create(request.title_of_the_program, athlete.id, coach.id,
+    create_or_update_to_api_redis(f"lock:create_program:{current_user.id}:{athlete.id}")
+    new_program = ExerciseProgram.create(request.title_of_the_program, athlete.id, coach.id,
                                             request.purpose_of_the_program, request.start_date, request.end_date, 
                                             request.number_of_weekly_sessions,request.program_status, 
                                             request.training_days, request.general_description,
                                             request.program_version, request.coach_note)
-        db.add(new_program) 
-        db.commit()
-        db.refresh(new_program)
-        new_notification = NotificationSystem.create(athlete.id, requests.type, requests.title, requests.text,
-                                                     requests.read_status)
-        db.add(new_notification)
-        db.commit()
-        return new_program
-    finally:
-        pass
+    commit(new_program, db)
+    new_notification = NotificationSystem(recipient=athlete.id, title="new exercise", text=f"{request.title_of_the_program}",
+                                          type=NotificationsRequiredEnum.new_training_program.value, )
+    commit_notification(new_notification, db)
+    return new_program
+
 
 
 @exercise_program_router.put("/update/{program_id}", response_model=ExerciseProgramResponse)
 def update_exercise_program(request: UpdateExerciseProgram,
-                            requests: CreateNotification,
                             db: Session = Depends(get_db),
                             athlete_id: int = Query(...),
                             current_user: User = Depends(get_current_user),
                             program: ExerciseProgram = Depends(get_exercise_program_for_path)):
-    
+
     check_admin(db, current_user, Permission.coach)
     coach = get_profile_coach(current_user.id, db)
     check_active_coach(coach.id, db)
     athlete = get_profile_athlete(athlete_id, db)
     accepted_coach_to_athlete(coach.id, athlete.id, db)
-    locked_key = f"lock:update_program:{coach.id}:{athlete.id}"
-    is_locked = redis_client.set(locked_key, "locked", ex=6, nx=True)
-
-    if not is_locked:
-        raise_bad_request("درخواست شما در حال پردازش است، لطفاً کمی صبر کنید.")
-    try:
-        program.update(request.title_of_the_program, request.purpose_of_the_program, request.start_date, request.end_date,
-        request.number_of_weekly_sessions, request.program_status, request.training_days, request.general_description,
-        request.program_version, request.coach_note)
-        db.commit()
-        db.refresh(program)
-        new_notification = NotificationSystem.create(athlete.id, requests.type, requests.title, requests.text,
-                                                     requests.read_status)
-        db.add(new_notification)
-        db.commit()
-        return program
-    finally:
-        pass
+    create_or_update_to_api_redis(f"lock:update_program:{coach.id}:{athlete.id}")
+    program.update(request.title_of_the_program, request.purpose_of_the_program, request.start_date, request.end_date,
+    request.number_of_weekly_sessions, request.program_status, request.training_days, request.general_description,
+    request.program_version, request.coach_note)
+    update(program, db)
+    new_notification = NotificationSystem(recipient=athlete.id, title="update or change exercise program", 
+                                          text=request.title_of_the_program, type=NotificationsRequiredEnum.change_training_program.value)
+    commit_notification(new_notification, db)
+    redis_client.delete(f"cache:exercise_program:{program.id}:{current_user.id}")
+    for key in redis_client.keys(f"cache:all_programs:{athlete.id}:{current_user.id}:*"):
+        redis_client.delete(key)
+    return program
 
 
 @exercise_program_router.delete("/delete/{program_id}")
@@ -152,8 +138,10 @@ def delete_program(db: Session = Depends(get_db),
     exists_daily_practice = db.query(DailyPractice).filter(DailyPractice.exercise_program_id==program.id).first()
     if exists_daily_practice:
         raise_bad_request("this program has daily practice")
-    db.delete(program)
-    db.commit()
+    delete(program, db)
+    redis_client.delete(f"cache:exercise_program:{program.id}:{current_user.id}")
+    for key in redis_client.keys(f"cache:all_programs:{athlete.id}:{current_user.id}:*"):
+        redis_client.delete(key)
     return {
         "detail" : "deleted successfully"
     }
@@ -172,8 +160,10 @@ def delete_program_with_all_daily_practice(db: Session = Depends(get_db),
     if program.coach_id != coach.id:
         raise_bad_request("you have not permission for this program")
     accepted_coach_to_athlete(coach.id, athlete.id, db)
-    db.delete(program)
-    db.commit()
+    delete(program, db)
+    redis_client.delete(f"cache:exercise_program:{program.id}:{current_user.id}")
+    for key in redis_client.keys(f"cache:all_programs:{athlete.id}:{current_user.id}:*"):
+        redis_client.delete(key)
     return {
         "detail" : "deleted successfully"
     }
@@ -212,32 +202,22 @@ def get_exercise_program_one(db: Session = Depends(get_db),
                          program: ExerciseProgram = Depends(get_exercise_program_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        if coach_profile.id != program.coach_id:
-            raise_bad_request("this program is not for you")
-        check_active_coach(coach_profile.id, db)
-        
-    elif user_role.role_id == 5:
-        athlete = get_profile_athlete_with_user_id(current_user.id, db)
-        check_active_athlete(athlete.id, db)
-        if program.athlete_id != athlete.id:
-            raise_bad_request("this program is not for you")
-            
-    elif user_role.role_id not in (1, 2, 3):
-        return {"detail": "you dont have permission"}
-
-    cache_key = f"cache:exercise_program:{program.id}"
-    cached_date = redis_client.get(cache_key)
-    
-    if cached_date:
-        return json.loads(cached_date)
-
-    response_model_obj = ExerciseProgramResponse.model_validate(program)
-    json_data = response_model_obj.model_dump_json()
-    redis_client.setex(cache_key, 600, json_data)
-    
-    return json.loads(json_data)                  
+    match user_role.role_id:
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            if coach_profile.id != program.coach_id:
+                raise_bad_request("this program is not for you")
+            check_active_coach(coach_profile.id, db)
+        case 5:
+            athlete = get_profile_athlete_with_user_id(current_user.id, db)
+            check_active_athlete(athlete.id, db)
+            if program.athlete_id != athlete.id:
+                raise_bad_request("this program is not for you")
+        case 1 | 2 | 3:      # or  برای true و false هستش خوب فهمیدی 
+            pass
+        case _:
+            raise_bad_request("you have not permision")
+    return get_for_redis(f"cache:exercise_program:{program.id}:{current_user.id}", ExerciseProgramResponse, program)              
 
 
 
@@ -247,37 +227,24 @@ def get_all_exercise_program(limit: int = Query(20, ge=1, le=100),
                              db: Session = Depends(get_db),
                              current_user: User = Depends(get_current_user),
                              athlete_profile: ProfileAthlete = Depends(get_profile_athlete_for_path)):
-    
+
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
-        pass 
-    elif user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
-        check_active_coach(coach_profile.id, db)
-    elif user_role.role_id == 5:
-        profile_athlete = get_profile_athlete_with_user_id(current_user.id, db)
-        if profile_athlete.id != athlete_profile.id:
-            raise_bad_request("this program is not for you")
-        check_active_athlete(profile_athlete.id, db)
-    else:
-        return {"detail": "you dont have permission"}
-
-    cache_key = f"cache:all_programs:{athlete_profile.id}:limit:{limit}:offset:{offset}"
-    
-    cached_data = redis_client.get(cache_key)
-    if cached_data:
-        return json.loads(cached_data)
-
-    programs_result = build_get_all_program_exercise(limit, offset, athlete_profile, db)
-
-    response_model_obj = ExerciseProgramResponses.model_validate(programs_result)
-    json_data = response_model_obj.model_dump_json()
-
-    redis_client.setex(cache_key, 600, json_data)
-
-    return json.loads(json_data)
-
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            pass 
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
+            check_active_coach(coach_profile.id, db)
+        case 5:
+            profile_athlete = get_profile_athlete_with_user_id(current_user.id, db)
+            if profile_athlete.id != athlete_profile.id:
+                raise_bad_request("this program is not for you")
+            check_active_athlete(profile_athlete.id, db)
+        case _:                         # همون معنی else رو میده فهمیدی 
+            raise_bad_request("you have not permision")
+    return get_for_redis(f"cache:all_programs:{athlete_profile.id}:{current_user.id}:limit:{limit}:offset:{offset}", 
+                         ExerciseProgramResponses, lambda: build_get_all_program_exercise(limit, offset, athlete_profile, db))
 
 
 # Daily_Practice
@@ -294,19 +261,11 @@ def create_daily_practice(request: CreateProgramDaily,
     check_active_coach(profile_coach.id, db)
     if program.coach_id != profile_coach.id:
         raise_bad_request("this program is not for you")
-    locked_key = f"create_daily_practice:{program.id}:{current_user.id}"
-    is_locked = redis_client.set(locked_key, "lock", ex=6, nx=True)
-    if not is_locked:
-        raise_bad_request("در حال پردازش هست کمی صبر کنید")
-    try:
-        new_daily_program = DailyPractice.create(program.id, request.title_session, request.day_number, request.description, request.warm_up,
-                                                 request.cardio, request.cool_down)
-        db.add(new_daily_program)
-        db.commit()
-        db.refresh(new_daily_program)
-        return new_daily_program
-    finally:
-        pass
+    create_or_update_to_api_redis(f"create_daily_practice:{program.id}:{current_user.id}")
+    new_daily_program = DailyPractice.create(program.id, request.title_session, request.day_number, request.description, request.warm_up,
+                                             request.cardio, request.cool_down)
+    commit(new_daily_program, db)
+    return new_daily_program
 
 
 @daily_practice_router.put("/update/{daily_practice_id}", response_model=ProgramDailyResponse)
@@ -321,17 +280,13 @@ def update_daily_practice(request: UpdateProgramDaily,
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != profile_coach.id:
         raise_bad_request("this program is not for you")
-    locked_key = f"update_daily_practice:{daily_practice.id}:{current_user.id}"
-    is_locked = redis_client.set(locked_key, "lock", ex=6, nx=True)
-    if not is_locked:
-        raise_bad_request("در حال پردازش هست کمی صبر کنید")
-    try:
-        daily_practice.update(request.title_session, request.day_number, request.description, request.warm_up, request.cardio, request.cool_down)
-        db.commit()
-        db.refresh(daily_practice)
-        return daily_practice
-    finally:
-        pass
+    create_or_update_to_api_redis(f"update_daily_practice:{daily_practice.id}:{current_user.id}")
+    daily_practice.update(request.title_session, request.day_number, request.description, request.warm_up, request.cardio, request.cool_down)
+    update(daily_practice, db)
+    redis_client.delete(f"get_one daily practice:{daily_practice.id}:{current_user.id}")
+    for key in redis_client.keys(f"cache_all_daily_practice:{program.id}:{current_user.id}:*"):
+        redis_client.delete(key)
+    return daily_practice
 
 
 
@@ -339,15 +294,17 @@ def update_daily_practice(request: UpdateProgramDaily,
 def delete_daily_practice(db: Session = Depends(get_db),
                           current_user: User = Depends(get_current_user),
                           daily_practice: DailyPractice = Depends(get_daily_practice_for_path)):
-    
+
     check_admin(db, current_user, Permission.coach)
     profile_coach = get_profile_coach(current_user.id, db)
     check_active_coach(profile_coach.id, db)
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-    if not program.coach_id != profile_coach.id:
+    if program.coach_id != profile_coach.id:
         raise_bad_request("this program is not for you")
-    db.delete(daily_practice)
-    db.commit()
+    delete(daily_practice, db)
+    redis_client.delete(f"get_one daily practice:{daily_practice.id}:{current_user.id}")
+    for key in redis_client.keys(f"cache_all_daily_practice:{program.id}:{current_user.id}:*"):
+        redis_client.delete(key)
     return {
         "detail" : "deleted successfully"
     }
@@ -361,33 +318,26 @@ def get_one(db: Session = Depends(get_db),
                         daily_practice: DailyPractice = Depends(get_daily_practice_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
-        pass
-    elif user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        if program.coach_id != coach_profile.id:
-            raise_bad_request("daily practice is not for you")
-        check_active_coach(coach_profile.id, db)
-    elif user_role.role_id == 5:
-        profile_athlete = get_profile_athlete_with_user_id(current_user.id, db)
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        if program.athlete_id != profile_athlete.id:
-            raise_bad_request("daily practice is not for you")
-        check_active_athlete(profile_athlete.id, db)
-    else:
-        return {
-            "detail" : "you have not permision"
-        }
-    cache_key = f"get_one daily practice:{daily_practice.id}:{current_user.id}"
-    cache_data = redis_client.get(cache_key)
-    if cache_data:
-        return json.loads(cache_data)
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            pass
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            if program.coach_id != coach_profile.id:
+                raise_bad_request("daily practice is not for you")
+            check_active_coach(coach_profile.id, db)
+        case 5:
+            profile_athlete = get_profile_athlete_with_user_id(current_user.id, db)
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            if program.athlete_id != profile_athlete.id:
+                raise_bad_request("daily practice is not for you")
+            check_active_athlete(profile_athlete.id, db)
+        case _:
+            raise_bad_request("you have not permision")
     daily_result = db.query(DailyPractice).join(ExerciseProgram).filter(DailyPractice.id==daily_practice.id).first()
-    model_response = ProgramDailyResponseForOne.model_validate(daily_result)
-    json_data = model_response.model_dump_json()
-    redis_client.setex(cache_key, 600, json_data)
-    return json.loads(json_data)
+    return get_for_redis(f"get_one daily practice:{daily_practice.id}:{current_user.id}", 
+                         ProgramDailyResponseForOne, daily_result)
 
 
 
@@ -399,32 +349,23 @@ def get_all(limit: int = Query(20, ge=1, le=100),
             program: ExerciseProgram = Depends(get_exercise_program_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
-        pass
-    elif user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        if coach_profile.id != program.coach_id:
-            raise_bad_request("this program is not for you")
-        check_active_coach(coach_profile.id, db)
-    elif user_role.role_id == 5:
-        profile_athlete = get_profile_athlete(current_user.id, db)
-        check_active_athlete(profile_athlete.id, db)
-        if program.athlete_id != profile_athlete.id:
-            raise_bad_request("this program is not for you")
-    else:
-        return {
-            "detail" : "you have not permision"
-        }
-    cache_key = f"cache_all_daily_practice:{program.id}:{current_user.id}:{limit}:{offset}"
-    cache_data = redis_client.get(cache_key)
-    if cache_data:
-        return json.loads(cache_data)
-    data_result = build_get_all_daily_practice(limit, offset, program, db)
-    response_model = ProgramDailyResponses.model_validate(data_result)
-    model_not_json = response_model.model_dump_json()
-    redis_client.setex(cache_key, 600, model_not_json)
-    return json.loads(model_not_json)
-
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            pass
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            if coach_profile.id != program.coach_id:
+                raise_bad_request("this program is not for you")
+            check_active_coach(coach_profile.id, db)
+        case 5:
+            profile_athlete = get_profile_athlete(current_user.id, db)
+            check_active_athlete(profile_athlete.id, db)
+            if program.athlete_id != profile_athlete.id:
+                raise_bad_request("this program is not for you")
+        case _:
+            raise_bad_request("you have not permision")
+    return get_for_redis(f"cache_all_daily_practice:{program.id}:{current_user.id}:{limit}:{offset}", 
+                  ProgramDailyResponses, lambda: build_get_all_daily_practice(limit, offset, program, db))
 
 # Movement_Bank
 
@@ -435,20 +376,12 @@ def create_movement_bank(request: CreateMovementBank,
                          current_user: User = Depends(get_current_user)):
     
     check_admin(db, current_user, Permission.club_manager)
-    locked_key = f"create_movement_bank:{current_user.id}:{request.english_name}"
-    is_locked = redis_client.set(locked_key, "lock", ex=6, nx=True)
-    if not is_locked:
-        raise_bad_request("در حال پردازش است لطفا صبور باشید.")
-    try:
-        new_movement = MovementBank.create(request.persion_name, request.english_name, request.category, request.target_muscle, request.auxiliary_muscles,
-                                                request.required_equipment, request.difficulty_level, request.description_for_move, request.executive_warnings,
-                                                request.active_status, request.image, request.video_link)
-        db.add(new_movement)
-        db.commit()
-        db.refresh(new_movement)
-        return new_movement
-    finally:
-        pass
+    create_or_update_to_api_redis(f"create_movement_bank:{current_user.id}:{request.english_name}")
+    new_movement = MovementBank.create(request.persion_name, request.english_name, request.category, request.target_muscle, request.auxiliary_muscles,
+                                            request.required_equipment, request.difficulty_level, request.description_for_move, request.executive_warnings,
+                                            request.active_status, request.image, request.video_link)
+    commit(new_movement)
+    return new_movement
 
 
 
@@ -459,19 +392,15 @@ def update_movement_bank(request: UpdateMovementBank,
                          movement_bank: MovementBank = Depends(get_movement_bank_for_path)):
 
     check_admin(db, current_user, Permission.club_manager)
-    locked_key = f"update_movement_bank:{current_user.id}:{movement_bank.id}"
-    is_locked = redis_client.set(locked_key, "lock", ex=6, nx=True)
-    if not is_locked:
-        raise_bad_request("در حال پردازش است لطفا صبور باشید.")
-    try:
-        movement_bank.update(request.persion_name, request.english_name, request.category, request.target_muscle,
-                             request.auxiliary_muscles, request.required_equipment, request.difficulty_level, request.description_for_move,
-                             request.executive_warnings, request.active_status, request.image, request.video_link)
-        db.commit()
-        db.refresh(movement_bank)
-        return movement_bank
-    finally:
-        pass
+    create_or_update_to_api_redis(f"update_movement_bank:{current_user.id}:{movement_bank.id}")
+    movement_bank.update(request.persion_name, request.english_name, request.category, request.target_muscle,
+                         request.auxiliary_muscles, request.required_equipment, request.difficulty_level, request.description_for_move,
+                         request.executive_warnings, request.active_status, request.image, request.video_link)
+    update(movement_bank)
+    redis_client.delete(f"get_one_movement:{movement_bank.id}")
+    for key in redis_client.keys(f"get_all_movement_bank:*"):
+        redis_client.delete(key)
+    return movement_bank
 
 
 @movement_bank_router.delete("/delete/{movement_bank_id}")
@@ -486,12 +415,17 @@ def delete_movement_bank(db: Session = Depends(get_db),
     if exists_information_for_movement:
         movement_bank.active_status = ActiveStatusMovement.no.value
         db.commit()
+        redis_client.delete(f"get_one_movement:{movement_bank.id}")
+        for key in redis_client.keys(f"get_all_movement_bank:*"):
+            redis_client.delete(key)
         return {
             "detail": "This movement is used in programs, so it was disabled instead of deleted."
         }
     else:
-        db.delete(movement_bank)
-        db.commit()
+        delete(movement_bank)
+        redis_client.delete(f"get_one_movement:{movement_bank.id}")
+        for key in redis_client.keys(f"get_all_movement_bank:*"):
+            redis_client.delete(key)
         return {
             "detail": "Movement deleted successfully"
         }
@@ -503,26 +437,18 @@ def get_one(db: Session = Depends(get_db),
             movement_bank: MovementBank = Depends(get_movement_bank_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
-        pass
-    elif user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        check_active_coach(coach_profile.id, db)
-    elif user_role.role_id == 5:
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        check_active_athlete(athlete_profile.id, db)
-    else:
-        return {
-            "detail" : "you have not permission"
-        }
-    locked_key = f"get_one_movement:{movement_bank.id}"
-    exists_data = redis_client.get(locked_key)
-    if exists_data:
-        return json.loads(exists_data)
-    data = MovementBankresponse.model_validate(movement_bank)
-    not_json_data = data.model_dump_json()
-    redis_client.setex(locked_key, 600, not_json_data)
-    return json.loads(not_json_data)
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            pass
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            check_active_coach(coach_profile.id, db)
+        case 5:
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            check_active_athlete(athlete_profile.id, db)
+        case _:
+            raise_bad_request("you have not permission")
+    return get_for_redis(f"get_one_movement:{movement_bank.id}", MovementBankresponse, movement_bank)
     
 
 
@@ -534,28 +460,19 @@ def get_all(limit: int = Query(20, ge=1, le=100),
             current_user: User = Depends(get_current_user)):
     
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
-        pass
-    elif user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        check_active_coach(coach_profile.id, db)
-    elif user_role.role_id == 5:
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        check_active_athlete(athlete_profile.id, db)
-    else:
-        return {
-            "detail" : "you have not permission"
-        }                                       
-
-    locked_key = f"get_all_movement_bank:{limit}:{offset}"
-    exists = redis_client.get(locked_key)
-    if exists:
-        return json.loads(exists)
-    cache_data = build_get_all_movement_bank(limit, offset, db)
-    responses = MovementBankresponses.model_validate(cache_data)
-    responses_not_json = responses.model_dump_json()
-    redis_client.setex(locked_key, 600, responses_not_json)
-    return json.loads(responses_not_json)
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            pass
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            check_active_coach(coach_profile.id, db)
+        case 5:
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            check_active_athlete(athlete_profile.id, db)
+        case _:
+            raise_bad_request("you have not permission")
+    return get_for_redis(f"get_all_movement_bank:{limit}:{offset}", MovementBankresponses, 
+                         lambda: build_get_all_movement_bank(limit, offset, db))
 
 
 # Information_For_Movement
@@ -574,13 +491,12 @@ def create_information_for_movement(request: CreateInformationForMovement,
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != coach_profile.id:
         raise_bad_request("this program is not for you")
+    create_or_update_to_api_redis(f"create_information_movement:{current_user.id}:{daily_practice.id}:{movement.id}")
     new = InformationForMovement.create(movement.id, daily_practice.id, request.move_name, request.set_number, request.number_of_repeat,
                                         request.practice_time, request.rest_time, request.tempo, request.exercise_intensity, request.display_order,
                                         request.being_a_superset_or_a_dropset, request.move_picture, request.link_video, request.suggested_weight,
                                         request.description_coach, request.alternate_move)
-    db.add(new)
-    db.commit()
-    db.refresh(new)
+    commit(new, db)
     return new
 
 
@@ -597,14 +513,19 @@ def update_information_for_movement(request: UpdateMovementBank,
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != coach_profile.id:
         raise_bad_request("this program is not for you")
+    create_or_update_to_api_redis(f"update_information_for_movement:{current_user.id}:{movement_info.id}")
     movement_info.update(request.move_name, request.move_picture, request.link_video, request.set_number,
                         request.number_of_repeat, request.suggested_weight, request.practice_time, request.rest_time,
                         request.tempo, request.exercise_intensity,request.description_coach, request.display_order,
                         request.alternate_move, request.being_a_superset_or_a_dropset)
-    db.commit()
-
+    update(movement_info, db)
+    redis_client.delete(f"get_one_information_for_movement_with:{current_user.id}:{daily_practice.id}")
+    for key in redis_client.keys(f"get_all_information_for_movement:{daily_practice.id}:{current_user.id}:*"):
+        redis_client.delete(key)
+    for key in redis_client.keys(f"get_information_for_movement_guide:{movement_info.id}"):
+        redis_client.delete(key)
     return movement_info
-    
+
 
 
 
@@ -617,41 +538,43 @@ def delete_information_for_movement(db: Session = Depends(get_db),
     coach_profile = get_profile_coach(current_user.id, db)
     check_active_coach(coach_profile.id, db)
     daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
-    program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.id).first()
+    program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.coach_id != coach_profile.id:
         raise_bad_request("this program is not for you")
-    db.delete(movement_info)
-    db.commit()
+    delete(movement_info, db)
+    redis_client.delete(f"get_one_information_for_movement_with:{current_user.id}:{daily_practice.id}")
+    for key in redis_client.keys(f"get_all_information_for_movement:{daily_practice.id}:{current_user.id}:*"):
+        redis_client.delete(key)
+    for key in redis_client.keys(f"get_information_for_movement_guide:{movement_info.id}"):
+        redis_client.delete(key)
     return {
         "detail" : "deleted successfully"
     }
 
 
-@information_for_movement_router.get("/get/{daily_practice_id}")
+@information_for_movement_router.get("/get/{daily_practice_id}", response_model=ProgramDailyWithInformationForMovement)
 def get_information_movement_with_daily_practice(db: Session = Depends(get_db),
                                                  current_user: User = Depends(get_current_user),
                                                  daily_practice: DailyPractice = Depends(get_daily_practice_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):   
-        return build_daily_practice_with_information_practice(daily_practice)
-    elif user_role.role_id == 4:
-        coach = get_profile_coach(current_user.id, db)
-        check_active_coach(coach.id, db)
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        accepted_coach_to_athlete(coach.id, program.athlete_id, db)
-        return build_daily_practice_with_information_practice(daily_practice)
-    elif user_role.role_id == 5:
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        if program.athlete_id != athlete_profile.id:
-            raise_bad_request("this program is not for you")
-        return build_daily_practice_with_information_practice(daily_practice)
-    else:
-        return {
-            "detail" : "you have not permission"
-        }
-
+    match user_role.role_id:
+        case 1 | 2 | 3: 
+            pass
+        case 4:
+            coach = get_profile_coach(current_user.id, db)
+            check_active_coach(coach.id, db)
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            accepted_coach_to_athlete(coach.id, program.athlete_id, db)
+        case 5:
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            if program.athlete_id != athlete_profile.id:
+                raise_bad_request("this program is not for you")
+        case _:
+            raise_bad_request("you have not permission")
+    return get_for_redis(f"get_one_information_for_movement_with:{current_user.id}:{daily_practice.id}", 
+                  ProgramDailyWithInformationForMovement, lambda: build_daily_practice_with_information_practice(daily_practice))
 
 
 @information_for_movement_router.get("/get/all/information/for/movement/{daily_practice_id}", response_model=InformationForMovementResponses)
@@ -662,62 +585,56 @@ def get_all_information_for_movement(limit: int = Query(20, ge=1, le=100),
                                      daily_practice: DailyPractice = Depends(get_daily_practice_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
-        return build_get_all_information_for_movement(limit, offset, daily_practice, db)
-    elif user_role.role_id == 4:
-        coach = get_profile_coach(current_user.id, db)
-        check_active_coach(coach.id, db)
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        accepted_coach_to_athlete(coach.id, program.athlete_id, db)
-        return build_get_all_information_for_movement(limit, offset, daily_practice, db)
-    elif user_role.role_id == 5:
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        check_active_athlete(athlete_profile.id, db)
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        if program.athlete_id != athlete_profile.id:
-            raise_bad_request("this program is not for you")
-        return build_get_all_information_for_movement(limit, offset, daily_practice, db)
-    else:
-        return {
-            "detail" : "you have not permision"
-        }
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            pass
+        case 4:
+            coach = get_profile_coach(current_user.id, db)
+            check_active_coach(coach.id, db)
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            accepted_coach_to_athlete(coach.id, program.athlete_id, db)
+        case 5:
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            check_active_athlete(athlete_profile.id, db)
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            if program.athlete_id != athlete_profile.id:
+                raise_bad_request("this program is not for you")
+        case _:
+            raise_bad_request("you have not permision")
+    return get_for_redis(f"get_all_information_for_movement:{daily_practice.id}:{current_user.id}:{limit}:{offset}", 
+                  InformationForMovementResponses, lambda: build_get_all_information_for_movement(limit, offset, daily_practice, db))
 
 
-
-
-@information_for_movement_router.get("/get/all/{information_movement_id}")
+@information_for_movement_router.get("/get/all/{information_movement_id}", response_model=InformationForMovementGuideResponse)
 def get_information_movement_with_movement_guide(db: Session = Depends(get_db),
                                                  current_user: User = Depends(get_current_user),
                                                  movement_info: InformationForMovement = Depends(get_information_for_movement_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
-        return build_information_movement(movement_info)
-    elif user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        check_active_coach(coach_profile.id, db)
-        daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        if program.coach_id != coach_profile.id:
-            raise_bad_request("you cat not see guide movement becouse this program is not for you")
-    elif user_role.role_id == 5:
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        check_active_athlete(athlete_profile.id, db)
-        daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
-        program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
-        if athlete_profile.id != program.athlete_id:
-            raise_bad_request("you cat not see guide movement")
-        return build_information_movement(movement_info)
-    else:
-        return {
-            "detail" : "you have not permission"
-        }
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            pass
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            check_active_coach(coach_profile.id, db)
+            daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            if program.coach_id != coach_profile.id:
+                raise_bad_request("you cat not see guide movement becouse this program is not for you")
+        case 5:
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            check_active_athlete(athlete_profile.id, db)
+            daily_practice = db.query(DailyPractice).filter(DailyPractice.id==movement_info.daily_practice_id).first()
+            program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
+            if athlete_profile.id != program.athlete_id:
+                raise_bad_request("you cat not see guide movement")                            
+        case _:
+            raise_bad_request("you have not permission")
+    return get_for_redis(f"get_information_for_movement_guide:{movement_info.id}", 
+                  InformationForMovementGuideResponse, lambda: build_information_movement(movement_info))
 
 
-
-
-
-# Registration_Daily_Practice
+# Registration_Daily_Practice   
 
 
 
@@ -736,13 +653,12 @@ def create_registration_daily_practice(request: CreateRegistrationDailyPractice,
     program = db.query(ExerciseProgram).filter(ExerciseProgram.id==daily_practice.exercise_program_id).first()
     if program.athlete_id != athlete_profile.id:
         raise_bad_request("this program is not for you")
+    create_or_update_to_api_redis(f"create_registration_daily_practice:{current_user.id}:{daily_practice.id}:{information_movement.id}")
     new = RegistrationDailyPractice.create(athlete_profile.id, information_movement.id, request.done_status,
                                             request.done_date, request.actual_weight_used, request.actual_number_repeat,
                                             request.difficulty_exercise, request.time_practice, request.description_for_coach,
                                             request.problem_during_exercise)
-    db.add(new)
-    db.commit()
-    db.refresh(new)
+    commit(new)
     return new
 
 
@@ -759,8 +675,7 @@ def update_registration_daily_practice(request: UpdateRegistrationDailyPractice,
         raise_bad_request("this registration is not for you")
     registration.update(request.done_status, request.done_date,request.actual_weight_used, request.actual_number_repeat, 
                         request.difficulty_exercise, request.time_practice, request.description_for_coach, request.problem_during_exercise)
-    db.commit()
-    db.refresh(registration)
+    update(registration)
     return registration
 
 
@@ -771,32 +686,33 @@ def delete_registration_daily_practice(db: Session = Depends(get_db),
                                        registration: RegistrationDailyPractice = Depends(get_registration_daily_practice_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
-    if user_role.role_id in (1, 2, 3):
+    match user_role.role_i:
+        case 1 | 2 | 3:
             db.delete(registration)
             db.commit()
             return {
                 "detail" : "deleted successfully"
-            }   
-    elif user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        check_active_coach(coach_profile.id, db)
-        accepted_coach_to_athlete(coach_profile.id, registration.athlete_id, db)
-        db.delete(registration)
-        db.commit()
-        return {
-            "detail" : "deleted successfully"
-        }
-    else:
-        check_admin(db, current_user, Permission.athlete)
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        check_active_athlete(athlete_profile.id, db)
-        if registration.athlete_id != athlete_profile.id:
-            raise_bad_request("this registration is not for you")
-        db.delete(registration)
-        db.commit()
-        return {
-            "detail" : "deleted successfully"
-        }
+            }
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            check_active_coach(coach_profile.id, db)
+            accepted_coach_to_athlete(coach_profile.id, registration.athlete_id, db)
+            delete(registration)
+            return {
+                "detail" : "deleted successfully"
+            }
+        case 5:
+            check_admin(db, current_user, Permission.athlete)
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            check_active_athlete(athlete_profile.id, db)
+            if registration.athlete_id != athlete_profile.id:
+                raise_bad_request("this registration is not for you")
+            delete(registration)
+            return {
+                "detail" : "deleted successfully"
+            }
+        case _:
+            raise_bad_request("you have not permission")
 
 
 @registration_daily_practice_router.get("/get/{registration_daily_practice_id}")
@@ -805,22 +721,24 @@ def get_registration_daily_practice_router(db: Session = Depends(get_db),
                                            registration: RegistrationDailyPractice = Depends(get_registration_daily_practice_for_path)):
 
     user_role = db.query(UserRole).filter(UserRole.user_id==current_user.id).first()
+    match user_role.role_id:
+        case 1 | 2 | 3:
+            return build_registration_daily_practice(registration, db)
+        case 4:
+            coach_profile = get_profile_coach(current_user.id, db)
+            check_active_coach(coach_profile.id, db)
+            athlete_profile = registration.athlete_id
+            accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
+            return build_registration_daily_practice(registration, db)
+        case 5:
+            athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
+            check_active_athlete(athlete_profile.id, db)
+            if registration.athlete_id != athlete_profile.id:
+                raise_bad_request("this registration is not for you")
+            return build_registration_daily_practice(registration, db)
+        case _:
+            raise_bad_request("you have not permission")
 
-    if user_role.role_id == 3:
-        return build_registration_daily_practice(registration, db)
-    if user_role.role_id == 4:
-        coach_profile = get_profile_coach(current_user.id, db)
-        check_active_coach(coach_profile.id, db)
-        athlete_profile = registration.athlete_id
-        accepted_coach_to_athlete(coach_profile.id, athlete_profile.id, db)
-        return build_registration_daily_practice(registration, db)
-    if user_role.role_id == 5:
-        athlete_profile = get_profile_athlete_with_user_id(current_user.id, db)
-        check_active_athlete(athlete_profile.id, db)
-        if registration.athlete_id != athlete_profile.id:
-            raise_bad_request("this registration is not for you")
-        return build_registration_daily_practice(registration, db)
-        
 
 
 
